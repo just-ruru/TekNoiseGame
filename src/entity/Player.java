@@ -12,6 +12,7 @@ import java.security.Key;
 public class Player extends Entity{
     GamePanel gp;
     KeyHandler keyH;
+    private int choice = 1;
 
     public final int screenX;
     public final int screenY;
@@ -41,29 +42,109 @@ public class Player extends Entity{
     }
 
     public void getPlayerImage(){
-        try{
-            up1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_1.png"));
-            up2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_2.png"));
-            up3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_3.png"));
-            up4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_4.png"));
 
-            down1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Down/cabo_down_1.png"));
-            down2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Down/cabo_down_2.png"));
-            down3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Down/cabo_down_3.png"));
-            down4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Down/cabo_down_4.png"));
+        switch(choice){
+            case 1:
+                try{
+                    up1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_1.png"));
+                    up2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_2.png"));
+                    up3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_3.png"));
+                    up4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_4.png"));
 
-            left1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Left/cabo_left_1.png"));
-            left2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Left/cabo_left_2.png"));
-            left3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Left/cabo_left_3.png"));
-            left4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Left/cabo_left_4.png"));
+                    down1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Down/cabo_down_1.png"));
+                    down2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Down/cabo_down_2.png"));
+                    down3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Down/cabo_down_3.png"));
+                    down4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Down/cabo_down_4.png"));
 
-            right1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_1.png"));
-            right2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_2.png"));
-            right3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_3.png"));
-            right4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_4.png"));
-        }catch(IOException e){
-            e.printStackTrace();
-        }
+                    left1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Left/cabo_left_1.png"));
+                    left2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Left/cabo_left_2.png"));
+                    left3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Left/cabo_left_3.png"));
+                    left4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Left/cabo_left_4.png"));
+
+                    right1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_1.png"));
+                    right2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_2.png"));
+                    right3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_3.png"));
+                    right4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_4.png"));
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
+                break;
+            case 2:
+                try{
+                    up1 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Up/gasha_up_1.png"));
+                    up2 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Up/gasha_up_2.png"));
+                    up3 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Up/gasha_up_3.png"));
+                    up4 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Up/gasha_up_4.png"));
+
+                    down1 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Down/gasha_down_1.png"));
+                    down2 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Down/gasha_down_2.png"));
+                    down3 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Down/gasha_down_3.png"));
+                    down4 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Down/gasha_down_4.png"));
+
+                    left1 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Left/gasha_left_1.png"));
+                    left2 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Left/gasha_left_2.png"));
+                    left3 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Left/gasha_left_3.png"));
+                    left4 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Left/gasha_left_4.png"));
+
+                    right1 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Right/gasha_right_1.png"));
+                    right2 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Right/gasha_right_2.png"));
+                    right3 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Right/gasha_right_3.png"));
+                    right4 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Right/gasha_right_4.png"));
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
+                break;
+            case 3:
+                try{
+                    up1 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Up/rayos_up_1.png"));
+                    up2 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Up/rayos_up_2.png"));
+                    up3 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Up/rayos_up_3.png"));
+                    up4 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Up/rayos_up_4.png"));
+
+                    down1 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Down/rayos_down_1.png"));
+                    down2 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Down/rayos_down_2.png"));
+                    down3 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Down/rayos_down_3.png"));
+                    down4 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Down/rayos_down_4.png"));
+
+                    left1 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Left/rayos_left_1.png"));
+                    left2 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Left/rayos_left_2.png"));
+                    left3 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Left/rayos_left_3.png"));
+                    left4 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Left/rayos_left_4.png"));
+
+                    right1 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Right/rayos_right_1.png"));
+                    right2 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Right/rayos_right_2.png"));
+                    right3 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Right/rayos_right_3.png"));
+                    right4 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Right/rayos_right_4.png"));
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
+                break;
+
+            case 4:
+                try{
+                    up1 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Up/gemal_up_1.png"));
+                    up2 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Up/gemal_up_2.png"));
+                    up3 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Up/gemal_up_3.png"));
+                    up4 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Up/gemal_up_4.png"));
+
+                    down1 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Down/gemal_down_1.png"));
+                    down2 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Down/gemal_down_2.png"));
+                    down3 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Down/gemal_down_3.png"));
+                    down4 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Down/gemal_down_4.png"));
+
+                    left1 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Left/gemal_left_1.png"));
+                    left2 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Left/gemal_left_2.png"));
+                    left3 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Left/gemal_left_3.png"));
+                    left4 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Left/gemal_left_4.png"));
+
+                    right1 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Right/gemal_right_1.png"));
+                    right2 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Right/gemal_right_2.png"));
+                    right3 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Right/gemal_right_3.png"));
+                    right4 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Right/gemal_right_4.png"));
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
+                break;
     }
 
     public void update(){
@@ -188,7 +269,26 @@ public class Player extends Entity{
                 break;
         }
 
-        g2.drawImage(image, screenX, screenY, 25*2, 40*2, null);
+        switch(choice) {
+            case 1:
+                g2.drawImage(image, screenX, screenY, 25 * 2, 40 * 2, null);
+                break;
+
+            case 2:
+                g2.drawImage(image, screenX, screenY, 29*2, 32*2, null);
+                break;
+
+            case 3:
+                g2.drawImage(image, screenX, screenY, 25*2, 41*2, null);
+                break;
+
+            case 4:
+                g2.drawImage(image, screenX, screenY, 31*2, 37*2, null);
+                break;
+            default:
+                break;
+        }
+
 
     }
 }
