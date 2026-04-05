@@ -26,8 +26,8 @@ public class Player extends Entity{
 
         solidArea = new Rectangle();
         solidArea.x = 8;
-        solidArea.y = 16;
-        solidArea.width = 32;
+        solidArea.y = 45;
+        solidArea.width = 28;
         solidArea.height = 32;
 
         setDefaultValues();
@@ -35,8 +35,8 @@ public class Player extends Entity{
     }
 
     public void setDefaultValues(){
-        stageX = gp.tileSize * 16;
-        stageY = gp.tileSize * 8;
+        stageX = gp.tileSize * 3;
+        stageY = gp.tileSize * 11;
         speed = 4;
         direction = "down";
     }
