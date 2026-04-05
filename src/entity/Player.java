@@ -12,17 +12,23 @@ import java.security.Key;
 public class Player extends Entity{
     GamePanel gp;
     KeyHandler keyH;
+    private int choice = 1;
 
     public final int screenX;
     public final int screenY;
-    private int choice;
 
-    public Player(GamePanel gp, KeyHandler keyH, int choice){
+    public Player(GamePanel gp, KeyHandler keyH){
         this.gp = gp;
         this.keyH = keyH;
-        this.choice = choice;
+
         screenX = gp.screenWidth / 2 - (gp.tileSize / 2);
         screenY = gp.screenHeight / 2 - (gp.tileSize / 2);
+
+        solidArea = new Rectangle();
+        solidArea.x = 8;
+        solidArea.y = 16;
+        solidArea.width = 32;
+        solidArea.height = 32;
 
         setDefaultValues();
         getPlayerImage();
@@ -30,15 +36,16 @@ public class Player extends Entity{
 
     public void setDefaultValues(){
         stageX = gp.tileSize * 16;
-        stageY = gp.tileSize * 16;
+        stageY = gp.tileSize * 8;
         speed = 4;
         direction = "down";
     }
 
-    public void getPlayerImage(){
-        switch(choice){
+    public void getPlayerImage() {
+
+        switch (choice) {
             case 1:
-                try{
+                try {
                     up1 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_1.png"));
                     up2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_2.png"));
                     up3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Up/cabo_up_3.png"));
@@ -58,12 +65,12 @@ public class Player extends Entity{
                     right2 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_2.png"));
                     right3 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_3.png"));
                     right4 = ImageIO.read(getClass().getResourceAsStream("/player/Lerler/Right/cabo_right_4.png"));
-                }catch(IOException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 break;
             case 2:
-                try{
+                try {
                     up1 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Up/gasha_up_1.png"));
                     up2 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Up/gasha_up_2.png"));
                     up3 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Up/gasha_up_3.png"));
@@ -83,12 +90,12 @@ public class Player extends Entity{
                     right2 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Right/gasha_right_2.png"));
                     right3 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Right/gasha_right_3.png"));
                     right4 = ImageIO.read(getClass().getResourceAsStream("/player/Gasha/Right/gasha_right_4.png"));
-                }catch(IOException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 break;
             case 3:
-                try{
+                try {
                     up1 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Up/rayos_up_1.png"));
                     up2 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Up/rayos_up_2.png"));
                     up3 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Up/rayos_up_3.png"));
@@ -108,13 +115,13 @@ public class Player extends Entity{
                     right2 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Right/rayos_right_2.png"));
                     right3 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Right/rayos_right_3.png"));
                     right4 = ImageIO.read(getClass().getResourceAsStream("/player/Nnyl/Right/rayos_right_4.png"));
-                }catch(IOException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 break;
 
             case 4:
-                try{
+                try {
                     up1 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Up/gemal_up_1.png"));
                     up2 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Up/gemal_up_2.png"));
                     up3 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Up/gemal_up_3.png"));
@@ -134,32 +141,49 @@ public class Player extends Entity{
                     right2 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Right/gemal_right_2.png"));
                     right3 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Right/gemal_right_3.png"));
                     right4 = ImageIO.read(getClass().getResourceAsStream("/player/Gemal/Right/gemal_right_4.png"));
-                }catch(IOException e){
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
                 break;
-
-            default:
-
-                break;
         }
-
     }
 
     public void update(){
         if(keyH.isUpPressed == true || keyH.isDownPressed == true || keyH.isLeftPressed == true || keyH.isRightPressed == true){
             if(keyH.isUpPressed == true){
                 direction = "up";
-                stageY -= speed;
             } else if (keyH.isDownPressed == true) {
                 direction = "down";
-                stageY += speed;
             } else if (keyH.isLeftPressed == true) {
                 direction = "left";
-                stageX -= speed;
             } else if (keyH.isRightPressed == true) {
                 direction = "right";
-                stageX += speed;
+            }
+
+            // CHECK TILE COLLISION
+            collisionOn = false;
+            gp.cChecker.checkTile(this);
+
+            // IF COLLISION IS FALSE, PLAYER CAN MOVE
+            if(collisionOn == false) {
+
+                switch(direction) {
+                    case "up":
+                        stageY -= speed;
+                        break;
+
+                    case "down":
+                        stageY += speed;
+                        break;
+
+                    case "left":
+                        stageX -= speed;
+                        break;
+
+                    case "right":
+                        stageX += speed;
+                        break;
+                }
             }
 
             spriteCounter++;
@@ -178,91 +202,93 @@ public class Player extends Entity{
         }
     }
 
-    public void draw(Graphics2D g2){
+    public void draw(Graphics2D g2) {
 //        g2.setColor(Color.RED);
 //        g2.fillOval(x, y, gp.tileSize, gp.tileSize);
 
         BufferedImage image = null;
 
-        switch(direction){
+        switch (direction) {
             case "up":
-                if(spriteNum == 1){
+                if (spriteNum == 1) {
                     image = up1;
                 }
-                if(spriteNum == 2){
+                if (spriteNum == 2) {
                     image = up2;
                 }
-                if(spriteNum == 3){
+                if (spriteNum == 3) {
                     image = up3;
                 }
-                if(spriteNum == 4){
+                if (spriteNum == 4) {
                     image = up4;
                 }
                 break;
 
             case "down":
-                if(spriteNum == 1){
+                if (spriteNum == 1) {
                     image = down1;
                 }
-                if(spriteNum == 2){
+                if (spriteNum == 2) {
                     image = down2;
                 }
-                if(spriteNum == 3){
+                if (spriteNum == 3) {
                     image = down3;
                 }
-                if(spriteNum == 4){
+                if (spriteNum == 4) {
                     image = down4;
                 }
                 break;
 
             case "left":
-                if(spriteNum == 1){
+                if (spriteNum == 1) {
                     image = left1;
                 }
-                if(spriteNum == 2){
+                if (spriteNum == 2) {
                     image = left2;
                 }
-                if(spriteNum == 3){
+                if (spriteNum == 3) {
                     image = left3;
                 }
-                if(spriteNum == 4){
+                if (spriteNum == 4) {
                     image = left4;
                 }
                 break;
 
             case "right":
-                if(spriteNum == 1){
+                if (spriteNum == 1) {
                     image = right1;
                 }
-                if(spriteNum == 2){
+                if (spriteNum == 2) {
                     image = right2;
                 }
-                if(spriteNum == 3){
+                if (spriteNum == 3) {
                     image = right3;
                 }
-                if(spriteNum == 4){
+                if (spriteNum == 4) {
                     image = right4;
                 }
                 break;
         }
-        switch(choice) {
+
+        switch (choice) {
             case 1:
                 g2.drawImage(image, screenX, screenY, 25 * 2, 40 * 2, null);
-            break;
+                break;
 
             case 2:
-                g2.drawImage(image, screenX, screenY, 29*2, 32*2, null);
-            break;
+                g2.drawImage(image, screenX, screenY, 29 * 2, 32 * 2, null);
+                break;
 
             case 3:
-                g2.drawImage(image, screenX, screenY, 25*2, 41*2, null);
-            break;
+                g2.drawImage(image, screenX, screenY, 25 * 2, 41 * 2, null);
+                break;
 
             case 4:
-                g2.drawImage(image, screenX, screenY, 31*2, 37*2, null);
-            break;
+                g2.drawImage(image, screenX, screenY, 31 * 2, 37 * 2, null);
+                break;
             default:
                 break;
         }
     }
 }
+

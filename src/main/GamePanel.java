@@ -1,7 +1,6 @@
 package main;
 
 import entity.Player;
-import object.SuperObject;
 import tile.TileManager;
 
 import javax.swing.*;
@@ -22,31 +21,26 @@ public class GamePanel extends JPanel implements Runnable{
     public final int screenHeight = tileSize * maxScreenRow; // 576 pixels
 
     // WORLD SETTINGS
-    public final int maxStageCol = 50;
-    public final int maxStageRow = 50;
+    public final int maxStageCol = 42;
+    public final int maxStageRow = 14;
     public final int worldWidth = tileSize * maxStageCol;
     public final int worldHeight = tileSize * maxStageRow;
 
-    //PLAYER CHOICE
-    public int choice = 1;
 
     // FPS
     int FPS = 60;
-    Thread gameThread;
 
     TileManager tileM = new TileManager(this);
     KeyHandler keyH = new KeyHandler();
-    Player player = new Player(this,keyH, choice);
-    public SuperObject obj[] = new SuperObject[10]; // display 10 objects at the same time
-    public AssetSetter assetSetter = new AssetSetter(this);
+    Thread gameThread;
+    public CollisionChecker cChecker = new CollisionChecker(this);
+    public Player player = new Player(this,keyH);
+    Sound sound = new Sound();
 
 
     int playerX = 100;
     int playerY = 100;
     int playerSpeed = 4;
-
-
-
 
     public GamePanel (){
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
@@ -56,8 +50,9 @@ public class GamePanel extends JPanel implements Runnable{
         this.setFocusable(true);
     }
 
-    public void setupGame(){
-        assetSetter.setObject();
+    public void setupGame() {
+
+        playMusic(0);
     }
 
     public void startGameThread(){
@@ -108,6 +103,23 @@ public class GamePanel extends JPanel implements Runnable{
         player.draw((Graphics2D) g2);
 
         g2.dispose();
+    }
+
+    public void playMusic(int i) {
+
+        sound.setFile(i);
+        sound.play();
+        sound.loop();
+    }
+
+    public void stopMusic() {
+
+        sound.stop();
+    }
+
+    public void playSE(int i) {
+        sound.setFile(i);
+        sound.play();
     }
 
 }

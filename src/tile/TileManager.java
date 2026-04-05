@@ -12,15 +12,15 @@ import java.io.InputStreamReader;
 public class TileManager {
 
     GamePanel gp;
-    Tile[] tile;
-    int mapTileNum[][];
+    public Tile[] tile;
+    public int mapTileNum[][];
 
     public TileManager(GamePanel gp) {
 
         this.gp = gp;
 
         tile = new Tile[10];
-        mapTileNum = new int[gp.maxScreenColumn][gp.maxScreenRow];
+        mapTileNum = new int[gp.maxStageCol][gp.maxStageRow];
 
         getTileImage();
         loadMap();
@@ -31,7 +31,32 @@ public class TileManager {
         try {
 
             tile[0] = new Tile();
-            tile[0].image = ImageIO.read(getClass().getResourceAsStream("/tiles/floor.png"));
+            tile[0].image = ImageIO.read(getClass().getResourceAsStream("/tiles/0.png"));
+
+            tile[1] = new Tile();
+            tile[1].image = ImageIO.read(getClass().getResourceAsStream("/tiles/1.png"));
+
+            tile[2] = new Tile();
+            tile[2].image = ImageIO.read(getClass().getResourceAsStream("/tiles/2.png"));
+
+            tile[3] = new Tile();
+            tile[3].image = ImageIO.read(getClass().getResourceAsStream("/tiles/3.png"));
+
+            tile[4] = new Tile();
+            tile[4].image = ImageIO.read(getClass().getResourceAsStream("/tiles/4.png"));
+
+            tile[5] = new Tile();
+            tile[5].image = ImageIO.read(getClass().getResourceAsStream("/tiles/5.png"));
+
+            tile[6] = new Tile();
+            tile[6].image = ImageIO.read(getClass().getResourceAsStream("/tiles/6.png"));
+
+            tile[7] = new Tile();
+            tile[7].image = ImageIO.read(getClass().getResourceAsStream("/tiles/7.png"));
+
+            tile[8] = new Tile();
+            tile[8].image = ImageIO.read(getClass().getResourceAsStream("/tiles/8.png"));
+
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -73,24 +98,30 @@ public class TileManager {
 
     public void draw(Graphics2D g2) {
 
-        int col = 0;
-        int row = 0;
-        int x = 0;
-        int y = 0;
+        int stageCol = 0;
+        int stageRow = 0;
 
-        while(col < gp.maxScreenColumn && row < gp.maxScreenRow) {
+        while(stageCol < gp.maxStageCol && stageRow < gp.maxStageRow) {
 
-            int tileNum = mapTileNum[col][row];
+            int tileNum = mapTileNum[stageCol][stageRow];
 
-            g2.drawImage(tile[tileNum].image, x, y, gp.tileSize, gp.tileSize, null);
-            col++;
-            x += gp.tileSize;
+            int stageX = stageCol * gp.tileSize;
+            int stageY = stageRow * gp.tileSize;
+            int screenX =  stageX - gp.player.stageX + gp.player.screenX;
+            int screenY = stageY - gp.player.stageY + gp.player.screenY;
 
-            if(col == gp.maxScreenColumn) {
-                col = 0;
-                x = 0;
-                row++;
-                y += gp.tileSize;
+            if(stageX + gp.tileSize > gp.player.stageX - gp.player.screenX &&
+               stageX - gp.tileSize < gp.player.stageX + gp.player.screenX &&
+               stageY + gp.tileSize > gp.player.stageY - gp.player.screenY &&
+               stageY - gp.tileSize < gp.player.stageY + gp.player.screenY) {
+
+                g2.drawImage(tile[tileNum].image, screenX, screenY, gp.tileSize, gp.tileSize, null);
+            }
+            stageCol++;
+
+            if(stageCol == gp.maxStageCol) {
+                stageCol = 0;
+                stageRow++;
             }
         }
     }

@@ -1,16 +1,19 @@
-package object;
+package objects;
 
 import javax.imageio.ImageIO;
 import java.io.IOException;
 
-public class OBJ_Bag extends SuperObject{
-
+public class OBJ_Bag extends objects.SuperObject {
     public OBJ_Bag(){
         name = "Bag";
         try{
-            image = ImageIO.read(getClass().getResourceAsStream("/objects/bag2.png"));
+            image = ImageIO.read(getClass().getResourceAsStream("/objects/Bag3.png"));
         }catch(IOException e){
             e.printStackTrace();
         }
     }
 }
+
+
+
+
