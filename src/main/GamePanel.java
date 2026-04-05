@@ -17,11 +17,12 @@ public class GamePanel extends JPanel {
     final int screenWidth = tileSize * maxScreenColumn; // 768 pixels
     final int screenHeight = tileSize * maxScreenRow; // 576 pixels
 
+    Thread ganmeThread;
+
 
     public GamePanel (){
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
         this.setBackground(Color.black);
         this.setDoubleBuffered(true);
-
     }
 }

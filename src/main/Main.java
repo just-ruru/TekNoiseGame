@@ -11,9 +11,13 @@ public class Main {
     window.setResizable(false);
     window.setTitle("TekNoise Game");
 
+    GamePanel gamePanel = new GamePanel();
+    window.add(gamePanel);
+
+    window.pack();
+
     window.setLocationRelativeTo(null);
     window.setVisible(true);
-
 
     }
 }
