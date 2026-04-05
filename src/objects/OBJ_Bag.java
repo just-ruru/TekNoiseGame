@@ -3,7 +3,7 @@ package objects;
 import javax.imageio.ImageIO;
 import java.io.IOException;
 
-public class OBJ_Bag extends object.SuperObject {
+public class OBJ_Bag extends objects.SuperObject {
     public OBJ_Bag(){
         name = "Bag";
         try{
