@@ -1,6 +1,8 @@
 package main;
 
-import tile.TileManager;
+//import tile.TileManager;
+
+import entity.Player;
 
 import javax.swing.*;
 import java.awt.*;
@@ -24,11 +26,14 @@ public class GamePanel extends JPanel implements Runnable{
 
     KeyHandler keyH = new KeyHandler();
     Thread gameThread;
+    Player player = new Player(this,keyH);
 
     int playerX = 100;
     int playerY = 100;
     int playerSpeed = 4;
-    TileManager tileM = new TileManager(this);
+
+
+//    TileManager tileM = new TileManager(this);
 
 
     public GamePanel (){
@@ -45,15 +50,7 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void update(){
-        if(keyH.isUpPressed == true){
-            playerY -= playerSpeed;
-        } else if (keyH.isDownPressed == true) {
-            playerY += playerSpeed;
-        } else if (keyH.isLeftPressed == true) {
-            playerX -= playerSpeed;
-        } else if (keyH.isRightPressed == true) {
-            playerX += playerSpeed;
-        }
+        player.update();
     }
 
     public void run(){
@@ -91,11 +88,8 @@ public class GamePanel extends JPanel implements Runnable{
 
         Graphics g2 =(Graphics2D)g;
 
-        g2.setColor(Color.RED);
-
-        tileM.draw(g2);
-
-        g2.fillOval(playerX, playerY, tileSize, tileSize);
+//        tileM.draw((Graphics2D) g2);
+        player.draw((Graphics2D) g2);
 
         g2.dispose();
     }
