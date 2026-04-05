@@ -20,7 +20,7 @@ public class TileManager {
         this.gp = gp;
 
         tile = new Tile[10];
-        mapTileNum = new int[gp.maxScreenColumn][gp.maxScreenRow];
+        mapTileNum = new int[gp.maxStageCol][gp.maxStageRow];
 
         getTileImage();
         loadMap();
@@ -73,24 +73,30 @@ public class TileManager {
 
     public void draw(Graphics2D g2) {
 
-        int col = 0;
-        int row = 0;
-        int x = 0;
-        int y = 0;
+        int stageCol = 0;
+        int stageRow = 0;
 
-        while(col < gp.maxScreenColumn && row < gp.maxScreenRow) {
+        while(stageCol < gp.maxStageCol && stageRow < gp.maxStageRow) {
 
-            int tileNum = mapTileNum[col][row];
+            int tileNum = mapTileNum[stageCol][stageRow];
 
-            g2.drawImage(tile[tileNum].image, x, y, gp.tileSize, gp.tileSize, null);
-            col++;
-            x += gp.tileSize;
+            int stageX = stageCol * gp.tileSize;
+            int stageY = stageRow * gp.tileSize;
+            int screenX =  stageX - gp.player.stageX + gp.player.screenX;
+            int screenY = stageY - gp.player.stageY + gp.player.screenY;
 
-            if(col == gp.maxScreenColumn) {
-                col = 0;
-                x = 0;
-                row++;
-                y += gp.tileSize;
+            if(stageX + gp.tileSize > gp.player.stageX - gp.player.screenX &&
+               stageX - gp.tileSize < gp.player.stageX + gp.player.screenX &&
+               stageY + gp.tileSize > gp.player.stageY - gp.player.screenY &&
+               stageY - gp.tileSize < gp.player.stageY + gp.player.screenY) {
+
+                g2.drawImage(tile[tileNum].image, screenX, screenY, gp.tileSize, gp.tileSize, null);
+            }
+            stageCol++;
+
+            if(stageCol == gp.maxStageCol) {
+                stageCol = 0;
+                stageRow++;
             }
         }
     }
