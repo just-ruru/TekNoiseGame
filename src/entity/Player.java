@@ -12,14 +12,15 @@ import java.security.Key;
 public class Player extends Entity{
     GamePanel gp;
     KeyHandler keyH;
-    private int choice = 1;
+    private int choice;
 
     public final int screenX;
     public final int screenY;
 
-    public Player(GamePanel gp, KeyHandler keyH){
+    public Player(GamePanel gp, KeyHandler keyH, int choice){
         this.gp = gp;
         this.keyH = keyH;
+        this.choice = choice;
 
         screenX = gp.screenWidth / 2 - (gp.tileSize / 2);
         screenY = gp.screenHeight / 2 - (gp.tileSize / 2);
