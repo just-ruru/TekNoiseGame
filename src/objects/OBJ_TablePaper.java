@@ -5,7 +5,7 @@ import java.io.IOException;
 
 public class OBJ_TablePaper extends SuperObject{
     public OBJ_TablePaper(){
-        name = "TableWithPaper";
+        name = "TablePaper";
         try{
             image = ImageIO.read(getClass().getResourceAsStream("/objects/TableWithPaper.png"));
         }catch(IOException e){

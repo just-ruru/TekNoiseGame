@@ -170,7 +170,7 @@ public class Player extends Entity{
 
             //CHECK OBJ COLLISSION
             int objIndex = gp.cChecker.checkObject(this, true);
-//            pickUpObject(objIndex);
+            pickUpObject(objIndex);
             // IF COLLISION IS FALSE, PLAYER CAN MOVE
             if(collisionOn == false) {
 
@@ -209,11 +209,27 @@ public class Player extends Entity{
         }
     }
 
-//    public void pickUpObject(int i){
-//        if(i != 999){
-//           gp.obj[i] = null;
-//        }
-//    }
+    public void pickUpObject(int i){
+        if(i != 999){
+           String objectName = gp.obj[i].name;
+
+           switch(objectName){
+               case "Key":
+                   hasKey++;
+                   gp.obj[i]=null;
+                   break;
+
+               case "TablePaper":
+                   break;
+
+               case "Bag":
+                   break;
+
+               case "LightSwitch":
+                   break;
+           }
+        }
+    }
 
     public void draw(Graphics2D g2) {
 //        g2.setColor(Color.RED);

@@ -1,6 +1,7 @@
 package main;
 
 import objects.OBJ_Bag;
+import objects.OBJ_Key;
 import objects.OBJ_LightSwitch;
 import objects.OBJ_TablePaper;
 
@@ -24,6 +25,15 @@ public class AssetSetter {
         gp.obj[2] = new OBJ_Bag();
         gp.obj[2].stageX = 18 * gp.tileSize;
         gp.obj[2].stageY = 1 * gp.tileSize;
+
+        gp.obj[3] = new OBJ_Key();
+        gp.obj[3].stageX = 42 * gp.tileSize;
+        gp.obj[3].stageY = 12 * gp.tileSize;
+
+//        gp.obj[3] = new OBJ_Door();
+//        gp.obj[3].stageX = 18 * gp.tileSize;
+//        gp.obj[3].stageY = 1 * gp.tileSize;
+
 
     }
 }
