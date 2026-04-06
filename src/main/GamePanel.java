@@ -12,7 +12,6 @@ public class GamePanel extends JPanel implements Runnable{
     //SCREEN SETTINGS
     final int originalTileSize = 16;
     final int scale = 3;
-    private int choice = 1;
 
     public final int tileSize = originalTileSize * scale; // 48 x 48 tile size
 
