@@ -102,17 +102,20 @@ public class GamePanel extends JPanel implements Runnable{
 
     public void paintComponent(Graphics g){
         super.paintComponent(g);
+        //Note: The order of rendering is so important, basically first rendered is the bottom most layer
+        //followed by the next, this is how to create a layering system in the game.
+
         Graphics2D g2 = (Graphics2D)g;
-        //TILE
+        //TILE 1st layer
         tileM.draw(g2);
-        //PLAYER
-        player.draw(g2);
-        //OBJECT
+        //OBJECT 2nd layer
         for(int i = 0; i <obj.length; i++){
             if(obj[i] != null){
                 obj[i].draw(g2, this);
             }
         }
+        //PLAYER 3rd layer
+        player.draw(g2);
 
         g2.dispose();
     }

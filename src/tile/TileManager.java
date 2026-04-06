@@ -19,7 +19,7 @@ public class TileManager {
 
         this.gp = gp;
 
-        tile = new Tile[10];
+        tile = new Tile[99];
         mapTileNum = new int[gp.maxStageCol][gp.maxStageRow];
 
         getTileImage();
@@ -27,7 +27,23 @@ public class TileManager {
     }
 
     public void getTileImage() {
-
+        //GUIDE
+//        0 - Ground
+//        1 - wall
+//        2 - table
+//        3 - narrow table
+//        4 - chairs
+//        5 - table type2
+//        6 - table type3
+//        7 - placeholder
+//        8 - vase
+//        9 - door1
+//        10 - door2
+//        11 - tv1
+//        12 - tv2
+//        13 - Board1
+//        14 - Board2
+//
         try {
 
             tile[0] = new Tile();
@@ -65,13 +81,35 @@ public class TileManager {
             tile[8].image = ImageIO.read(getClass().getResourceAsStream("/tiles/8.png"));
             tile[8].collision = true;
 
+            tile[9] = new Tile();
+            tile[9].image = ImageIO.read(getClass().getResourceAsStream("/tiles/Door1.png"));
+            tile[9].collision = true;
+
+            tile[10] = new Tile();
+            tile[10].image = ImageIO.read(getClass().getResourceAsStream("/tiles/Door2.png"));
+            tile[10].collision = true;
+
+            tile[11] = new Tile();
+            tile[11].image = ImageIO.read(getClass().getResourceAsStream("/tiles/tv1.png"));
+            tile[11].collision = true;
+
+            tile[12] = new Tile();
+            tile[12].image = ImageIO.read(getClass().getResourceAsStream("/tiles/tv2.png"));
+            tile[12].collision = true;
+
+            tile[13] = new Tile();
+            tile[13].image = ImageIO.read(getClass().getResourceAsStream("/tiles/Board1.png"));
+            tile[13].collision = true;
+
+            tile[14] = new Tile();
+            tile[14].image = ImageIO.read(getClass().getResourceAsStream("/tiles/Board2.png"));
+            tile[14].collision = true;
 
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
     public void loadMap() {
-
         try {
             InputStream is = getClass().getResourceAsStream("/maps/stage01.txt");
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -79,28 +117,35 @@ public class TileManager {
             int col = 0;
             int row = 0;
 
-            while(col < gp.maxStageCol && row < gp.maxStageRow) {
-
+            while (col < gp.maxStageCol && row < gp.maxStageRow) {
                 String line = br.readLine();
 
-                while(col < gp.maxStageCol) {
+                if (line == null) break; // Guard against short/empty files
 
-                    String numbers[] = line.split(" ");
+                String[] numbers = line.trim().split("\\s+"); // Handles multiple spaces/tabs
 
+                while (col < gp.maxStageCol) {
                     int num = Integer.parseInt(numbers[col]);
 
-                    mapTileNum[col][row] = num;
+                    if (num >= 0 && num < tile.length) { // Bounds check against tile[]
+                        mapTileNum[col][row] = num;
+                    } else {
+                        System.out.println("Warning: tile ID " + num + " out of range at [" + col + "][" + row + "]");
+                    }
+
                     col++;
                 }
-                if(col == gp.maxStageCol) {
+
+                if (col == gp.maxStageCol) {
                     col = 0;
-                    row ++;
+                    row++;
                 }
             }
+
             br.close();
 
-        } catch(Exception e) {
-
+        } catch (Exception e) {
+            e.printStackTrace(); // Don't silently swallow errors
         }
     }
 
@@ -119,11 +164,16 @@ public class TileManager {
             int screenY = stageY - gp.player.stageY + gp.player.screenY;
 
             if(stageX + gp.tileSize > gp.player.stageX - gp.player.screenX &&
-               stageX - gp.tileSize < gp.player.stageX + gp.player.screenX &&
-               stageY + gp.tileSize > gp.player.stageY - gp.player.screenY &&
-               stageY - gp.tileSize < gp.player.stageY + gp.player.screenY) {
+                    stageX - gp.tileSize < gp.player.stageX + gp.player.screenX &&
+                    stageY + gp.tileSize > gp.player.stageY - gp.player.screenY &&
+                    stageY - gp.tileSize < gp.player.stageY + gp.player.screenY) {
 
-                g2.drawImage(tile[tileNum].image, screenX, screenY, gp.tileSize, gp.tileSize, null);
+
+                if (tile[tileNum] == null) {
+                    System.out.println("WARNING: tile[" + tileNum + "] is null at [" + stageCol + "][" + stageRow + "]");
+                } else {
+                    g2.drawImage(tile[tileNum].image, screenX, screenY, gp.tileSize, gp.tileSize, null);
+                }
             }
             stageCol++;
 

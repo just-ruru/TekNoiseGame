@@ -16,6 +16,7 @@ public class Player extends Entity{
 
     public final int screenX;
     public final int screenY;
+    int hasKey = 0;
 
     public Player(GamePanel gp, KeyHandler keyH, int choice){
         this.gp = gp;
@@ -28,6 +29,8 @@ public class Player extends Entity{
         solidArea = new Rectangle();
         solidArea.x = 8;
         solidArea.y = 45;
+        solidAreaDefaultX = solidArea.x;
+        solidAreaDefaultY = solidArea.y;
         solidArea.width = 28;
         solidArea.height = 32;
 
@@ -165,6 +168,9 @@ public class Player extends Entity{
             collisionOn = false;
             gp.cChecker.checkTile(this);
 
+            //CHECK OBJ COLLISSION
+            int objIndex = gp.cChecker.checkObject(this, true);
+//            pickUpObject(objIndex);
             // IF COLLISION IS FALSE, PLAYER CAN MOVE
             if(collisionOn == false) {
 
@@ -202,6 +208,12 @@ public class Player extends Entity{
             }
         }
     }
+
+//    public void pickUpObject(int i){
+//        if(i != 999){
+//           gp.obj[i] = null;
+//        }
+//    }
 
     public void draw(Graphics2D g2) {
 //        g2.setColor(Color.RED);
