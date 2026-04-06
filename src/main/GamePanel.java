@@ -1,6 +1,7 @@
 package main;
 
 import entity.Player;
+import objects.SuperObject;
 import tile.TileManager;
 
 import javax.swing.*;
@@ -30,12 +31,16 @@ public class GamePanel extends JPanel implements Runnable{
 
     // FPS
     int FPS = 60;
+    int choice = 1;
 
     TileManager tileM = new TileManager(this);
     KeyHandler keyH = new KeyHandler();
     Thread gameThread;
     public CollisionChecker cChecker = new CollisionChecker(this);
+    public AssetSetter assetSetter = new AssetSetter(this);
     public Player player = new Player(this,keyH, choice);
+    public SuperObject obj[]= new SuperObject[10];
+
     Sound sound = new Sound();
 
 
@@ -51,8 +56,9 @@ public class GamePanel extends JPanel implements Runnable{
         this.setFocusable(true);
     }
 
-    public void setupGame() {
 
+    public void setupGame() {
+        assetSetter.setObject();
         playMusic(0);
     }
 
@@ -97,11 +103,20 @@ public class GamePanel extends JPanel implements Runnable{
 
     public void paintComponent(Graphics g){
         super.paintComponent(g);
+        //Note: The order of rendering is so important, basically first rendered is the bottom most layer
+        //followed by the next, this is how to create a layering system in the game.
 
-        Graphics g2 = (Graphics2D)g;
-
-        tileM.draw((Graphics2D) g2);
-        player.draw((Graphics2D) g2);
+        Graphics2D g2 = (Graphics2D)g;
+        //TILE 1st layer
+        tileM.draw(g2);
+        //OBJECT 2nd layer
+        for(int i = 0; i <obj.length; i++){
+            if(obj[i] != null){
+                obj[i].draw(g2, this);
+            }
+        }
+        //PLAYER 3rd layer
+        player.draw(g2);
 
         g2.dispose();
     }
