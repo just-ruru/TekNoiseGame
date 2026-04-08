@@ -19,7 +19,7 @@ public class AssetSetter {
 
         gp.obj[1] = new OBJ_LightSwitch();
         gp.obj[1].stageX = 1 * gp.tileSize;
-        gp.obj[1].stageY = 0 * gp.tileSize;
+        gp.obj[1].stageY = 1 * gp.tileSize;
 
         //Bag 18x 1y
         gp.obj[2] = new OBJ_Bag();

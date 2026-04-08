@@ -73,7 +73,6 @@ public class CollisionChecker {
         for (int i = 0; i < gp.obj.length; i++) {
 
             if (gp.obj[i] != null) {
-//                System.out.println();
                 //get entity solid area position
                 entity.solidArea.x = entity.stageX + entity.solidArea.x;
                 entity.solidArea.y = entity.stageY + entity.solidArea.y;
@@ -136,6 +135,86 @@ public class CollisionChecker {
                 gp.obj[i].solidArea.y = gp.obj[i].solidAreaDefaultY;
             }
         }
+        return index;
+    }
+
+    // Check for objects the entity is currently overlapping, without "looking ahead"
+    // in the movement direction. Useful for interaction while standing still.
+    public int checkObjectAtCurrentPosition(Entity entity, boolean player) {
+        int index = 999;
+
+        for (int i = 0; i < gp.obj.length; i++) {
+            if (gp.obj[i] != null) {
+                // world → solid area positions
+                entity.solidArea.x = entity.stageX + entity.solidArea.x;
+                entity.solidArea.y = entity.stageY + entity.solidArea.y;
+
+                gp.obj[i].solidArea.x = gp.obj[i].stageX + gp.obj[i].solidArea.x;
+                gp.obj[i].solidArea.y = gp.obj[i].stageY + gp.obj[i].solidArea.y;
+
+                if (entity.solidArea.intersects(gp.obj[i].solidArea)) {
+                    if (gp.obj[i].collision) {
+                        entity.collisionOn = true;
+                    }
+                    if (player) {
+                        index = i;
+                    }
+                }
+
+                // reset to defaults
+                entity.solidArea.x = entity.solidAreaDefaultX;
+                entity.solidArea.y = entity.solidAreaDefaultY;
+                gp.obj[i].solidArea.x = gp.obj[i].solidAreaDefaultX;
+                gp.obj[i].solidArea.y = gp.obj[i].solidAreaDefaultY;
+            }
+        }
+
+        return index;
+    }
+
+    // Check for objects in front of the entity (interaction range), based on direction.
+    public int checkObjectInFront(Entity entity, boolean player, int distance) {
+        int index = 999;
+
+        for (int i = 0; i < gp.obj.length; i++) {
+            if (gp.obj[i] != null) {
+                // world → solid area positions
+                entity.solidArea.x = entity.stageX + entity.solidArea.x;
+                entity.solidArea.y = entity.stageY + entity.solidArea.y;
+
+                gp.obj[i].solidArea.x = gp.obj[i].stageX + gp.obj[i].solidArea.x;
+                gp.obj[i].solidArea.y = gp.obj[i].stageY + gp.obj[i].solidArea.y;
+
+                // offset the entity's area forward to form an interaction box
+                switch (entity.direction) {
+                    case "up":
+                        entity.solidArea.y -= distance;
+                        break;
+                    case "down":
+                        entity.solidArea.y += distance;
+                        break;
+                    case "left":
+                        entity.solidArea.x -= distance;
+                        break;
+                    case "right":
+                        entity.solidArea.x += distance;
+                        break;
+                }
+
+                if (entity.solidArea.intersects(gp.obj[i].solidArea)) {
+                    if (player) {
+                        index = i;
+                    }
+                }
+
+                // reset to defaults
+                entity.solidArea.x = entity.solidAreaDefaultX;
+                entity.solidArea.y = entity.solidAreaDefaultY;
+                gp.obj[i].solidArea.x = gp.obj[i].solidAreaDefaultX;
+                gp.obj[i].solidArea.y = gp.obj[i].solidAreaDefaultY;
+            }
+        }
+
         return index;
     }
 }

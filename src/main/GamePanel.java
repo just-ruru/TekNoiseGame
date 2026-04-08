@@ -26,7 +26,8 @@ public class GamePanel extends JPanel implements Runnable{
     public final int maxStageRow = 15;
     public final int worldWidth = tileSize * maxStageCol;
     public final int worldHeight = tileSize * maxStageRow;
-
+    public VignetteLight vignette = new VignetteLight(screenWidth, screenHeight);
+    private int interactCooldown = 0;
 
     // FPS
     int FPS = 60;
@@ -41,10 +42,14 @@ public class GamePanel extends JPanel implements Runnable{
     public UI ui = new UI(this);
     public Player player = new Player(this,keyH, choice);
     public SuperObject obj[]= new SuperObject[10];
+
+
+    Sound sound = new Sound();
+
     Thread gameThread;
 
-    int playerX = 100;
-    int playerY = 100;
+    int playerX = player.stageX;
+    int playerY = player.stageY;
     int playerSpeed = 4;
 
     public GamePanel (){
@@ -67,7 +72,12 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void update(){
+        if(interactCooldown > 0) {
+            interactCooldown--;
+        }
         player.update();
+        vignette.update();
+
     }
 
     public void run(){
@@ -116,6 +126,8 @@ public class GamePanel extends JPanel implements Runnable{
         }
         //PLAYER 3rd layer
         player.draw(g2);
+
+        vignette.draw(g2, player.screenX, player.screenY, tileSize, tileSize);
 
         // UI
         ui.draw(g2);

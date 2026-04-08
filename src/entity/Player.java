@@ -8,11 +8,13 @@ import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.security.Key;
+import main.VignetteLight;
 
 public class Player extends Entity{
     GamePanel gp;
     KeyHandler keyH;
     private int choice;
+    private int interactCooldown = 0;
 
     public final int screenX;
     public final int screenY;
@@ -41,7 +43,7 @@ public class Player extends Entity{
     public void setDefaultValues(){
         stageX = gp.tileSize * 3;
         stageY = gp.tileSize * 11;
-        speed = 4;
+        speed = 2;
         direction = "down";
     }
 
@@ -157,7 +159,13 @@ public class Player extends Entity{
     }
 
     public void update(){
-        if(keyH.isUpPressed == true || keyH.isDownPressed == true || keyH.isLeftPressed == true || keyH.isRightPressed == true){
+        if (interactCooldown > 0) {
+            interactCooldown--;
+        }
+
+        boolean moving = keyH.isUpPressed || keyH.isDownPressed || keyH.isLeftPressed || keyH.isRightPressed;
+
+        if(moving){
             if(keyH.isUpPressed == true){
                 direction = "up";
             } else if (keyH.isDownPressed == true) {
@@ -175,6 +183,7 @@ public class Player extends Entity{
             //CHECK OBJ COLLISSION
             int objIndex = gp.cChecker.checkObject(this, true);
             pickUpObject(objIndex);
+
             // IF COLLISION IS FALSE, PLAYER CAN MOVE
             if(collisionOn == false) {
 
@@ -211,40 +220,60 @@ public class Player extends Entity{
                 spriteCounter = 0;
             }
         }
+
+        // Allow interaction while standing still: press E when overlapping an object
+        if (keyH.interactPressed) {
+            // Prefer an interaction box in front of the player (so you don't need to be overlapping)
+            int objIndex = gp.cChecker.checkObjectInFront(this, true, gp.tileSize / 2);
+            if (objIndex == 999) {
+                // fallback: if you're already overlapping something, still allow it
+                objIndex = gp.cChecker.checkObjectAtCurrentPosition(this, true);
+            }
+            pickUpObject(objIndex);
+        }
     }
 
     public void pickUpObject(int i){
         if(i != 999){
-           String objectName = gp.obj[i].name;
+            String objectName = gp.obj[i].name;
 
-           switch(objectName){
-               case "Key":
-                   gp.playSE(1); // CHANGE THE SOUND TO AN ACTUAL KEY PLS
-                   hasKey++;
-                   gp.obj[i]=null;
-                   gp.ui.showMessage("You got a key!");
+            switch(objectName){
+                case "Switch":
+                    if (keyH.interactPressed && interactCooldown == 0) {              // E was pressed
+//                        gp.playSE(3);                     // optional sound effect
+//                        gp.ui.showMessage("Light toggled!");
+//                        gp.vignette.setLightOn(true);
+                        gp.vignette.toggleLight();
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
 
-                   break;
+                case "Key":
+                    gp.playSE(1); // CHANGE THE SOUND TO AN ACTUAL KEY PLS
+                    hasKey++;
+                    gp.obj[i]=null;
+                    gp.ui.showMessage("You got a key!");
 
-               case "Door":
-                   if(hasKey > 0) {
-                       gp.playSE(3);
-                       gp.obj[i] = null;
-                       hasKey--;
-                       gp.ui.showMessage("You opened the door!");
-                   } else {
-                       gp.ui.showMessage("You need a key!");
-                   }
+                    break;
 
-               case "TablePaper":
-                   break;
+                case "Door":
+                    if(hasKey > 0) {
+                        gp.playSE(3);
+                        gp.obj[i] = null;
+                        hasKey--;
+                        gp.ui.showMessage("You opened the door!");
+                    } else {
+                        gp.ui.showMessage("You need a key!");
+                    }
 
-               case "Bag":
-                   break;
+                case "TablePaper":
+                    break;
 
-               case "LightSwitch":
-                   break;
-           }
+                case "Bag":
+                    break;
+
+            }
         }
     }
 
