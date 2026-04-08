@@ -8,17 +8,21 @@ import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.security.Key;
+
+import main.Sound;
 import main.VignetteLight;
 
 public class Player extends Entity{
     GamePanel gp;
     KeyHandler keyH;
+    Sound walkingSound;
     private int choice;
     private int interactCooldown = 0;
 
     public final int screenX;
     public final int screenY;
     public int hasKey = 0;
+
 
     public Player(GamePanel gp, KeyHandler keyH, int choice){
         this.gp = gp;
@@ -38,6 +42,9 @@ public class Player extends Entity{
 
         setDefaultValues();
         getPlayerImage();
+
+        walkingSound = new Sound();
+        walkingSound.setFile(5);
     }
 
     public void setDefaultValues(){
@@ -170,6 +177,7 @@ public class Player extends Entity{
         boolean moving = keyH.isUpPressed || keyH.isDownPressed || keyH.isLeftPressed || keyH.isRightPressed;
 
         if(moving){
+
             if(keyH.isUpPressed == true){
                 direction = "up";
             } else if (keyH.isDownPressed == true) {
@@ -224,6 +232,15 @@ public class Player extends Entity{
                 spriteCounter = 0;
             }
         }
+
+        if (moving) {
+            if (!walkingSound.clip.isRunning()) {
+                walkingSound.loop(); // continuous walking loop
+            }
+        } else {
+            walkingSound.stop();
+        }
+
 
         // Allow interaction while standing still: press E when overlapping an object
         if (keyH.interactPressed) {
