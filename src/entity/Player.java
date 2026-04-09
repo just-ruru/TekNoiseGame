@@ -271,7 +271,7 @@ public class Player extends Entity{
                     break;
 
                 case "Key":
-                    gp.playSE(1); // CHANGE THE SOUND TO AN ACTUAL KEY PLS
+                    gp.playSE(3);
                     hasKey++;
                     gp.obj[i]=null;
                     gp.ui.showMessage("You got a key!");
