@@ -45,6 +45,37 @@ public class UI {
         this.g2 = g2;
         g2.setFont(arial_40);
         g2.setColor(Color.white);
+
+        //PLAY STATE
+        if(gp.gameState == gp.playState) {
+            drawPlayerLife();
+            drawKeyInventory();
+        }
+
+        if(gp.gameState == gp.pauseState) {
+            drawPauseScreen();
+        }
+
+    }
+    public void drawPauseScreen() {
+
+        String text = "PAUSED";
+
+        int x = getXforCenteredText(text);
+        int y = gp.screenHeight/2;
+
+        g2.drawString(text, x, y);
+    }
+
+    public int getXforCenteredText(String text) {
+
+        int length = (int)g2.getFontMetrics().getStringBounds(text, g2).getWidth();
+        int x = gp.screenWidth/2 - length/2;
+
+        return x;
+    }
+
+    public void drawKeyInventory() { // CUSTOM METHOD by Llama -- gi himo ni nako para maapil og wagtang ang key UI text (in draw method) when game is paused
         g2.drawImage(keyImage, gp.tileSize/2, gp.tileSize/2, gp.tileSize, gp.tileSize, null);
         g2.drawString("x "+ gp.player.hasKey, 74, 65);
 
@@ -61,11 +92,6 @@ public class UI {
                 messageOn = false;
             }
         }
-
-        //PLAY STATE
-        drawPlayerLife(); //put this method inside if condition for playstate once gamestates are implemented
-
-
     }
 
     public void drawPlayerLife() {

@@ -34,19 +34,23 @@ public class GamePanel extends JPanel implements Runnable{
     int choice = 1;
 
     TileManager tileM = new TileManager(this);
-    KeyHandler keyH = new KeyHandler();
+    KeyHandler keyH = new KeyHandler(this);
     Sound music = new Sound();
     Sound se = new Sound();
     public CollisionChecker cChecker = new CollisionChecker(this);
     public AssetSetter assetSetter = new AssetSetter(this);
     public UI ui = new UI(this);
+
+    Thread gameThread;
+
+    // ENTITY AND OBJECT
     public Player player = new Player(this,keyH, choice);
     public SuperObject obj[]= new SuperObject[10];
 
-
-    Sound sound = new Sound();
-
-    Thread gameThread;
+    // GAME STATE
+    public  int gameState;
+    public final int playState = 1;
+    public final  int pauseState = 2;
 
     int playerX = player.stageX;
     int playerY = player.stageY;
@@ -64,6 +68,8 @@ public class GamePanel extends JPanel implements Runnable{
     public void setupGame() {
         assetSetter.setObject();
         playMusic(0);
+        gameState = playState;
+
     }
 
     public void startGameThread(){
@@ -75,9 +81,13 @@ public class GamePanel extends JPanel implements Runnable{
         if(interactCooldown > 0) {
             interactCooldown--;
         }
-        player.update();
+        if(gameState == playState) {
+            player.update();
+        }
+        if(gameState == pauseState) {
+            // nothing
+        }
         vignette.update();
-
     }
 
     public void run(){
