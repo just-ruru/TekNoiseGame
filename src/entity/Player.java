@@ -25,6 +25,8 @@ public class Player extends Entity{
 
 
     public Player(GamePanel gp, KeyHandler keyH, int choice){
+        super(gp);
+
         this.gp = gp;
         this.keyH = keyH;
         this.choice = choice;
@@ -192,9 +194,13 @@ public class Player extends Entity{
             collisionOn = false;
             gp.cChecker.checkTile(this);
 
-            //CHECK OBJ COLLISSION
+            //CHECK OBJ COLLISION
             int objIndex = gp.cChecker.checkObject(this, true);
             pickUpObject(objIndex);
+
+            //CHECK MONSTER COLLISION
+            int monsterIndex = gp.cChecker.checkEntity(this, gp.monster);
+            contactMonster(monsterIndex);
 
             // IF COLLISION IS FALSE, PLAYER CAN MOVE
             if(collisionOn == false) {
@@ -252,6 +258,14 @@ public class Player extends Entity{
             }
             pickUpObject(objIndex);
         }
+
+        if(invincible == true) {
+            invincibleCounter++;
+            if(invincibleCounter > 60) {
+                invincible = false;
+                invincibleCounter = 0;
+            }
+        }
     }
 
     public void pickUpObject(int i){
@@ -294,6 +308,15 @@ public class Player extends Entity{
                 case "Bag":
                     break;
 
+            }
+        }
+    }
+
+    public void contactMonster(int i){
+        if(i != 999){
+            if(invincible == false) {
+                life -= 1;
+                invincible = true;
             }
         }
     }
@@ -384,6 +407,19 @@ public class Player extends Entity{
             default:
                 break;
         }
+
+        if(invincible == true) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
+        }
+
+
+        //reset alpha
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));
+
+        //debug
+//        g2.setFont(new Font("Arial", Font.PLAIN, 26));
+//        g2.setColor(Color.WHITE);
+//        g2.drawString("Invincible: " + invincibleCounter, 10, 400);
     }
 }
 

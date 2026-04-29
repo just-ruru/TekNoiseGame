@@ -1,5 +1,6 @@
 package main;
 
+import main.monster.MON_Dementor;
 import objects.OBJ_Bag;
 import objects.OBJ_Key;
 import objects.OBJ_LightSwitch;
@@ -35,5 +36,23 @@ public class AssetSetter {
 //        gp.obj[3].stageY = 1 * gp.tileSize;
 
 
+    }
+
+    public void setMonster() {
+        gp.monster[0] = new MON_Dementor(gp, 1);
+        gp.monster[0].stageX = gp.tileSize * 23;
+        gp.monster[0].stageY = gp.tileSize * 10;
+
+        gp.monster[1] = new MON_Dementor(gp, 2);
+        gp.monster[1].stageX = gp.tileSize * 28;
+        gp.monster[1].stageY = gp.tileSize * 11;
+
+        gp.monster[2] = new MON_Dementor(gp, 3);
+        gp.monster[2].stageX = gp.tileSize * 32;
+        gp.monster[2].stageY = gp.tileSize * 9;
+
+        gp.monster[3] = new MON_Dementor(gp, 1);
+        gp.monster[3].stageX = gp.tileSize * 35;
+        gp.monster[3].stageY = gp.tileSize * 15;
     }
 }
