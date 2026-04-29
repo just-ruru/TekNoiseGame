@@ -14,6 +14,7 @@ public class TileManager {
     GamePanel gp;
     public Tile[] tile;
     public int mapTileNum[][];
+    private String currentMapPath = "/maps/stage01.txt";
 
     public TileManager(GamePanel gp) {
 
@@ -23,7 +24,7 @@ public class TileManager {
         mapTileNum = new int[gp.maxStageCol][gp.maxStageRow];
 
         getTileImage();
-        loadMap();
+        loadMap(currentMapPath);
     }
 
     public void getTileImage() {
@@ -75,7 +76,8 @@ public class TileManager {
 
             tile[7] = new Tile();
             tile[7].image = ImageIO.read(getClass().getResourceAsStream("/tiles/7.png"));
-            tile[7].collision = true;
+            // Used as a placement marker in the map (e.g., door position), not as a wall.
+            tile[7].collision = false;
 
             tile[8] = new Tile();
             tile[8].image = ImageIO.read(getClass().getResourceAsStream("/tiles/8.png"));
@@ -109,9 +111,10 @@ public class TileManager {
             e.printStackTrace();
         }
     }
-    public void loadMap() {
+    public void loadMap(String mapPath) {
+        currentMapPath = mapPath;
         try {
-            InputStream is = getClass().getResourceAsStream("/maps/stage01.txt");
+            InputStream is = getClass().getResourceAsStream(mapPath);
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
             int col = 0;
@@ -147,6 +150,10 @@ public class TileManager {
         } catch (Exception e) {
             e.printStackTrace(); // Don't silently swallow errors
         }
+    }
+
+    public String getCurrentMapPath() {
+        return currentMapPath;
     }
 
     public void draw(Graphics2D g2) {

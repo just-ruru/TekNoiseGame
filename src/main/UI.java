@@ -14,9 +14,7 @@ public class UI {
     Font arial_40;
     BufferedImage keyImage;
     BufferedImage health_5, health_4, health_3, health_2, health_1, health_0;
-    public boolean messageOn = false;
-    public String message = "";
-    int messageCounter = 0;
+    private final DialogueBox dialogueBox;
 
     public UI (GamePanel gp) {
         this.gp = gp;
@@ -33,12 +31,24 @@ public class UI {
         health_2 = heart.image4;
         health_1 = heart.image5;
         health_0 = heart.image6;
+
+        dialogueBox = new DialogueBox(gp);
     }
 
     public void showMessage (String text) {
+        dialogueBox.show(text);
+    }
 
-        message = text;
-        messageOn = true;
+    public void update() {
+        dialogueBox.update();
+    }
+
+    public boolean isDialogueActive() {
+        return dialogueBox.isActive();
+    }
+
+    public void advanceDialogue() {
+        dialogueBox.advance();
     }
 
     public void draw(Graphics2D g2) {
@@ -55,6 +65,8 @@ public class UI {
         if(gp.gameState == gp.pauseState) {
             drawPauseScreen();
         }
+
+        dialogueBox.draw(g2);
 
     }
     public void drawPauseScreen() {
@@ -78,20 +90,6 @@ public class UI {
     public void drawKeyInventory() { // CUSTOM METHOD by Llama -- gi himo ni nako para maapil og wagtang ang key UI text (in draw method) when game is paused
         g2.drawImage(keyImage, gp.tileSize/2, gp.tileSize/2, gp.tileSize, gp.tileSize, null);
         g2.drawString("x "+ gp.player.hasKey, 74, 65);
-
-        // MESSAGE
-        if(messageOn == true) {
-
-            g2.setFont(g2.getFont().deriveFont(30F));
-            g2.drawString(message, gp.tileSize/2, gp.tileSize*5);
-
-            messageCounter++;
-
-            if(messageCounter > 120) {
-                messageCounter = 0;
-                messageOn = false;
-            }
-        }
     }
 
     public void drawPlayerLife() {

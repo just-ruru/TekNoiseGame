@@ -53,6 +53,14 @@ public class GamePanel extends JPanel implements Runnable{
     public  int gameState;
     public final int playState = 1;
     public final  int pauseState = 2;
+    public final int transitionState = 3;
+
+    // MAP / TRANSITION
+    private String currentMapPath = "/maps/stage01.txt";
+    private String nextMapPath = null;
+    private float fadeAlpha = 0f; // 0..1
+    private final float fadeSpeed = 0.06f;
+    private boolean fadeOutPhase = true;
 
     int playerX = player.stageX;
     int playerY = player.stageY;
@@ -68,10 +76,18 @@ public class GamePanel extends JPanel implements Runnable{
 
 
     public void setupGame() {
-        assetSetter.setObject();
+        // Stage start: keys are per-stage and shouldn't carry over.
+        player.hasKey = 0;
+        player.setDefaultValues();
+        player.setSpawnForMap(currentMapPath);
+        assetSetter.setObject(currentMapPath);
+//        assetSetter.setObject();
         assetSetter.setMonster();
         playMusic(0);
         gameState = playState;
+        ui.showMessage("Woke up* what the fuckkk!!!??\n\n"
+        + "You gotta be kidding me \n\n" + "Im outta here");
+
 
     }
 
@@ -95,7 +111,54 @@ public class GamePanel extends JPanel implements Runnable{
         if(gameState == pauseState) {
             // nothing
         }
+        if (gameState == transitionState) {
+            updateTransition();
+        }
+        ui.update();
         vignette.update();
+    }
+
+    private void updateTransition() {
+        if (nextMapPath == null) {
+            // Safety: cancel transition if no target set.
+            fadeAlpha = 0f;
+            gameState = playState;
+            return;
+        }
+
+        if (fadeOutPhase) {
+            fadeAlpha += fadeSpeed;
+            if (fadeAlpha >= 1f) {
+                fadeAlpha = 1f;
+
+                // Swap map at full black
+                currentMapPath = nextMapPath;
+                tileM.loadMap(currentMapPath);
+                player.setDefaultValues();
+                player.setSpawnForMap(currentMapPath);
+                player.hasKey = 0; // keys are per-stage
+                assetSetter.setObject(currentMapPath);
+
+                // now fade back in
+                fadeOutPhase = false;
+            }
+        } else {
+            fadeAlpha -= fadeSpeed;
+            if (fadeAlpha <= 0f) {
+                fadeAlpha = 0f;
+                nextMapPath = null;
+                fadeOutPhase = true;
+                gameState = playState;
+            }
+        }
+    }
+
+    public void startMapTransition(String mapPath) {
+        if (gameState == transitionState) return;
+        nextMapPath = mapPath;
+        fadeAlpha = 0f;
+        fadeOutPhase = true;
+        gameState = transitionState;
     }
 
     public void run(){
@@ -155,6 +218,16 @@ public class GamePanel extends JPanel implements Runnable{
 
         // UI
         ui.draw(g2);
+
+        // Fade overlay (draw last so it covers everything)
+        if (gameState == transitionState && fadeAlpha > 0f) {
+            Composite old = g2.getComposite();
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
+                    Math.min(1f, Math.max(0f, fadeAlpha))));
+            g2.setColor(Color.BLACK);
+            g2.fillRect(0, 0, screenWidth, screenHeight);
+            g2.setComposite(old);
+        }
 
         g2.dispose();
     }

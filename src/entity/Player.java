@@ -7,7 +7,6 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.security.Key;
 
 import main.Sound;
 import main.VignetteLight;
@@ -50,14 +49,25 @@ public class Player extends Entity{
     }
 
     public void setDefaultValues(){
-        stageX = gp.tileSize * 3;
-        stageY = gp.tileSize * 11;
-        speed = 2;
+        speed = 4;
         direction = "down";
 
         //PLAYER STATUS
         maxLife = 5;
         life = maxLife;
+    }
+
+    public void setSpawnForMap(String mapPath){
+        // Set spawn using tile coordinates: stageX = col * tileSize, stageY = row * tileSize
+        if ("/maps/stage02.txt".equals(mapPath)) {
+            stageX = gp.tileSize * 3;
+            stageY = gp.tileSize * 11;
+            return;
+        }
+
+        // Default (stage01 and any unknown maps)
+        stageX = gp.tileSize * 3;
+        stageY = gp.tileSize * 11;
     }
 
     public void getPlayerImage(){
@@ -172,6 +182,15 @@ public class Player extends Entity{
     }
 
     public void update(){
+        if (gp.ui.isDialogueActive()) {
+            if (keyH.interactPressed) {
+                gp.ui.advanceDialogue();
+                keyH.interactPressed = false;
+            }
+            walkingSound.stop();
+            return;
+        }
+
         if (interactCooldown > 0) {
             interactCooldown--;
         }
@@ -279,6 +298,7 @@ public class Player extends Entity{
 //                        gp.ui.showMessage("Light toggled!");
 //                        gp.vignette.setLightOn(true);
                         gp.vignette.toggleLight();
+                        gp.ui.showMessage("Lights are now on");
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -288,21 +308,32 @@ public class Player extends Entity{
                     gp.playSE(3);
                     hasKey++;
                     gp.obj[i]=null;
-                    gp.ui.showMessage("You got a key!");
+                    gp.ui.showMessage("You got a key!\n\nKeys in bag: " + hasKey);
 
                     break;
 
-                case "Door":
-                    if(hasKey > 0) {
-                        gp.playSE(3);
-                        gp.obj[i] = null;
-                        hasKey--;
-                        gp.ui.showMessage("You opened the door!");
-                    } else {
-                        gp.ui.showMessage("You need a key!");
+                case "DoorStage1":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        if(hasKey > 0) {
+                            gp.playSE(3);
+                            hasKey--;
+                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!");
+                            gp.startMapTransition("/maps/stage02.txt");
+                        } else {
+                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                        }
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
                     }
+                    break;
 
                 case "TablePaper":
+                    if(keyH.interactPressed && interactCooldown == 0){
+                        gp.ui.showMessage("asdasdasdasda\n\n scaryyyyyyy");
+
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
                     break;
 
                 case "Bag":

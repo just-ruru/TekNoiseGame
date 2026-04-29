@@ -13,6 +13,8 @@ public class OBJ_TablePaper extends SuperObject{
         }
 //        If we want to set a specific collision solid Area
 //        solidArea.x = 5;
+
+
         collision = true;
     }
 
