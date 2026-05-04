@@ -20,34 +20,69 @@ public class KeyHandler implements KeyListener {
     public void keyPressed(KeyEvent e) {
         int code = e.getKeyCode();
 
-        //character movement
-        if(code == KeyEvent.VK_W){
-            isUpPressed = true;
+        // TITLE STATE
+        if (gp.gameState == gp.titleState) {
+
+            if (code == KeyEvent.VK_W) {
+                gp.ui.commandNum--;
+                if (gp.ui.commandNum < 0) {
+                    gp.ui.commandNum = 2;
+                }
+            }
+            if (code == KeyEvent.VK_S) {
+                gp.ui.commandNum++;
+                if (gp.ui.commandNum > 2) {
+                    gp.ui.commandNum = 0;
+                }
+            }
+            if(code == KeyEvent.VK_ENTER) {
+                if(gp.ui.commandNum == 0) {
+                    gp.gameState = gp.playState;
+                    gp.playMusic(0);
+                    if(gp.gameState == gp.playState){
+                        gp.ui.showMessage("Woke up* what the fuckkk!!!??\n\n" + "You gotta be kidding me \n\n" + "Im outta here");
+                    }
+                }
+                if(gp.ui.commandNum == 1) {
+                    // add later
+                }
+                if(gp.ui.commandNum == 2) {
+                    System.exit(0);
+                }
+            }
         }
 
-        if(code == KeyEvent.VK_A){
-            isLeftPressed = true;
-        }
+        // PLAY STATE
+        if(gp.gameState == gp.playState) {
+            //character movement
+            if(code == KeyEvent.VK_W){
+                isUpPressed = true;
+            }
 
-        if(code == KeyEvent.VK_S){
-            isDownPressed = true;
-        }
+            if(code == KeyEvent.VK_A){
+                isLeftPressed = true;
+            }
 
-        if(code == KeyEvent.VK_D){
-            isRightPressed = true;
-        }
+            if(code == KeyEvent.VK_S){
+                isDownPressed = true;
+            }
 
-        if(code == KeyEvent.VK_E){
-            interactPressed = true;
-        }
+            if(code == KeyEvent.VK_D){
+                isRightPressed = true;
+            }
 
-        if(code == KeyEvent.VK_P){
-            if(gp.gameState == gp.playState) {
-                gp.gameState = gp.pauseState;
-                gp.pauseMusic();
-            } else if (gp.gameState == gp.pauseState) {
-                gp.gameState = gp.playState;
-                gp.resumeMusic();
+            if(code == KeyEvent.VK_E){
+                interactPressed = true;
+            }
+
+            if(code == KeyEvent.VK_P){
+                if(gp.gameState == gp.playState) {
+                    gp.gameState = gp.pauseState;
+                    gp.pauseMusic();
+                } else if (gp.gameState == gp.pauseState) {
+                    gp.gameState = gp.playState;
+                    gp.resumeMusic();
+                }
             }
         }
     }

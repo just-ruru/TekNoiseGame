@@ -51,6 +51,7 @@ public class GamePanel extends JPanel implements Runnable{
 
     // GAME STATE
     public  int gameState;
+    public final int titleState = 0;
     public final int playState = 1;
     public final  int pauseState = 2;
     public final int transitionState = 3;
@@ -83,11 +84,8 @@ public class GamePanel extends JPanel implements Runnable{
         assetSetter.setObject(currentMapPath);
 //        assetSetter.setObject();
         assetSetter.setMonster();
-        playMusic(0);
-        gameState = playState;
-        ui.showMessage("Woke up* what the fuckkk!!!??\n\n"
-        + "You gotta be kidding me \n\n" + "Im outta here");
-
+        // playMusic(0);
+        gameState = titleState;
 
     }
 
@@ -109,7 +107,7 @@ public class GamePanel extends JPanel implements Runnable{
             }
         }
         if(gameState == pauseState) {
-            // nothing
+            //nothing
         }
         if (gameState == transitionState) {
             updateTransition();
@@ -197,27 +195,38 @@ public class GamePanel extends JPanel implements Runnable{
         //followed by the next, this is how to create a layering system in the game.
 
         Graphics2D g2 = (Graphics2D)g;
-        //TILE 1st layer
-        tileM.draw(g2);
-        //OBJECT 2nd layer
-        for(int i = 0; i <obj.length; i++){
-            if(obj[i] != null){
-                obj[i].draw(g2, this);
-            }
-        }
-        //MONSTERS 3rd layer
-        for(int i = 0; i < monster.length; i++){
-            if(monster[i] != null){
-                monster[i].draw(g2);
-            }
-        }
-        //PLAYER 4th layer
-        player.draw(g2);
 
-        vignette.draw(g2, player.screenX, player.screenY, tileSize, tileSize);
+        // TITLE SCREEN
+        if(gameState == titleState) {
 
-        // UI
-        ui.draw(g2);
+            ui.draw(g2);
+        }
+        // OTHERS
+        else {
+            //TILE 1st layer
+            tileM.draw(g2);
+            //OBJECT 2nd layer
+            for(int i = 0; i <obj.length; i++){
+                if(obj[i] != null){
+                    obj[i].draw(g2, this);
+                }
+            }
+            //MONSTERS 3rd layer
+            for(int i = 0; i < monster.length; i++){
+                if(monster[i] != null){
+                    monster[i].draw(g2);
+                }
+            }
+            //PLAYER 4th layer
+            player.draw(g2);
+
+            vignette.draw(g2, player.screenX, player.screenY, tileSize, tileSize);
+
+            // UI
+            ui.draw(g2);
+        }
+
+
 
         // Fade overlay (draw last so it covers everything)
         if (gameState == transitionState && fadeAlpha > 0f) {
