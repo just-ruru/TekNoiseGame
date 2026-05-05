@@ -27,10 +27,11 @@ public class CollisionChecker {
         int entityBottomRow = entityBottomStageY / gp.tileSize;
 
         int tileNum1, tileNum2;
+        int collisionStep = entity.getCollisionStep();
 
         switch (entity.direction) {
             case "up":
-                entityTopRow = (entityTopStageY - entity.speed) / gp.tileSize;
+                entityTopRow = (entityTopStageY - collisionStep) / gp.tileSize;
                 if (isOutOfMap(entityLeftCol, entityTopRow) || isOutOfMap(entityRightCol, entityTopRow)) {
                     entity.collisionOn = true;
                     break;
@@ -43,7 +44,7 @@ public class CollisionChecker {
                 break;
 
             case "down":
-                entityBottomRow = (entityBottomStageY + entity.speed) / gp.tileSize;
+                entityBottomRow = (entityBottomStageY + collisionStep) / gp.tileSize;
                 if (isOutOfMap(entityLeftCol, entityBottomRow) || isOutOfMap(entityRightCol, entityBottomRow)) {
                     entity.collisionOn = true;
                     break;
@@ -56,7 +57,7 @@ public class CollisionChecker {
                 break;
 
             case "left":
-                entityLeftCol = (entityLeftStageX - entity.speed) / gp.tileSize;
+                entityLeftCol = (entityLeftStageX - collisionStep) / gp.tileSize;
                 if (isOutOfMap(entityLeftCol, entityTopRow) || isOutOfMap(entityLeftCol, entityBottomRow)) {
                     entity.collisionOn = true;
                     break;
@@ -69,7 +70,7 @@ public class CollisionChecker {
                 break;
 
             case "right":
-                entityRightCol = (entityRightStageX + entity.speed) / gp.tileSize;
+                entityRightCol = (entityRightStageX + collisionStep) / gp.tileSize;
                 if (isOutOfMap(entityRightCol, entityTopRow) || isOutOfMap(entityRightCol, entityBottomRow)) {
                     entity.collisionOn = true;
                     break;
@@ -101,9 +102,11 @@ public class CollisionChecker {
                 gp.obj[i].solidArea.x = gp.obj[i].stageX + gp.obj[i].solidArea.x;
                 gp.obj[i].solidArea.y = gp.obj[i].stageY + gp.obj[i].solidArea.y;
 
+                int collisionStep = entity.getCollisionStep();
+
                 switch (entity.direction) {
                     case "up":
-                        entity.solidArea.y -= entity.speed;
+                        entity.solidArea.y -= collisionStep;
                         if (entity.solidArea.intersects(gp.obj[i].solidArea)) {
                             if(gp.obj[i].collision == true){
                                 entity.collisionOn = true;
@@ -115,7 +118,7 @@ public class CollisionChecker {
                         }
                         break;
                     case "down":
-                        entity.solidArea.y += entity.speed;
+                        entity.solidArea.y += collisionStep;
                         if (entity.solidArea.intersects(gp.obj[i].solidArea)) {
                             if(gp.obj[i].collision == true){
                                 entity.collisionOn = true;
@@ -127,7 +130,7 @@ public class CollisionChecker {
                         }
                         break;
                     case "left":
-                        entity.solidArea.x -= entity.speed;
+                        entity.solidArea.x -= collisionStep;
                         if (entity.solidArea.intersects(gp.obj[i].solidArea)) {
                             if(gp.obj[i].collision == true){
                                 entity.collisionOn = true;
@@ -139,7 +142,7 @@ public class CollisionChecker {
                         }
                         break;
                     case "right":
-                        entity.solidArea.x += entity.speed;
+                        entity.solidArea.x += collisionStep;
                         if (entity.solidArea.intersects(gp.obj[i].solidArea)) {
                             if(gp.obj[i].collision == true){
                                 entity.collisionOn = true;
@@ -170,11 +173,13 @@ public class CollisionChecker {
         gp.player.solidArea.x = gp.player.stageX + gp.player.solidArea.x;
         gp.player.solidArea.y = gp.player.stageY + gp.player.solidArea.y;
 
+        int collisionStep = entity.getCollisionStep();
+
         switch(entity.direction) {
-            case "up": entity.solidArea.y -= entity.speed; break;
-            case "down": entity.solidArea.y += entity.speed; break;
-            case "left": entity.solidArea.x -= entity.speed; break;
-            case "right": entity.solidArea.x += entity.speed; break;
+            case "up": entity.solidArea.y -= collisionStep; break;
+            case "down": entity.solidArea.y += collisionStep; break;
+            case "left": entity.solidArea.x -= collisionStep; break;
+            case "right": entity.solidArea.x += collisionStep; break;
         }
 
         if(entity.solidArea.intersects(gp.player.solidArea)) {
@@ -283,11 +288,13 @@ public class CollisionChecker {
                 target[i].solidArea.y = target[i].stageY + target[i].solidArea.y;
 
                 // offset the entity's area forward to form an interaction box
+                int collisionStep = entity.getCollisionStep();
+
                 switch (entity.direction) {
-                    case "up": entity.solidArea.y -= entity.speed; break;
-                    case "down": entity.solidArea.y += entity.speed; break;
-                    case "left": entity.solidArea.x -= entity.speed; break;
-                    case "right": entity.solidArea.x += entity.speed; break;
+                    case "up": entity.solidArea.y -= collisionStep; break;
+                    case "down": entity.solidArea.y += collisionStep; break;
+                    case "left": entity.solidArea.x -= collisionStep; break;
+                    case "right": entity.solidArea.x += collisionStep; break;
                 }
 
                 if(entity.solidArea.intersects(target[i].solidArea)) {

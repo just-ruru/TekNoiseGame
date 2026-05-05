@@ -11,7 +11,9 @@ import java.io.IOException;
 public class Entity {
     GamePanel gp;
     public int stageX, stageY;
-    public int speed;
+    public float speed;
+    private float moveRemainderX = 0f;
+    private float moveRemainderY = 0f;
 
     public BufferedImage up1, up2, up3, up4, down1, down2, down3, down4, left1, left2, left3, left4, right1, right2, right3, right4;
     public String direction;
@@ -42,6 +44,25 @@ public class Entity {
     }
 
     public void setAction() {}
+
+    public int getCollisionStep() {
+        return Math.max(1, (int)Math.ceil(speed));
+    }
+
+    public void moveStage(float dx, float dy) {
+        moveRemainderX += dx;
+        moveRemainderY += dy;
+
+        int moveX = (int)moveRemainderX;
+        int moveY = (int)moveRemainderY;
+
+        stageX += moveX;
+        stageY += moveY;
+
+        moveRemainderX -= moveX;
+        moveRemainderY -= moveY;
+    }
+
     public void update() {
 
         setAction();
@@ -63,19 +84,19 @@ public class Entity {
 
             switch(direction) {
                 case "up":
-                    stageY -= speed;
+                    moveStage(0, -speed);
                     break;
 
                 case "down":
-                    stageY += speed;
+                    moveStage(0, speed);
                     break;
 
                 case "left":
-                    stageX -= speed;
+                    moveStage(-speed, 0);
                     break;
 
                 case "right":
-                    stageX += speed;
+                    moveStage(speed, 0);
                     break;
             }
         }

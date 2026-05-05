@@ -21,6 +21,7 @@ public class Player extends Entity{
     public final int screenX;
     public final int screenY;
     public int hasKey = 0;
+    public boolean hasReplacementSwitch = false;
 
 
     public Player(GamePanel gp, KeyHandler keyH, int choice){
@@ -49,7 +50,7 @@ public class Player extends Entity{
     }
 
     public void setDefaultValues(){
-        speed = 4;
+        speed = 2.5f;
         direction = "down";
 
         //PLAYER STATUS
@@ -60,6 +61,12 @@ public class Player extends Entity{
     public void setSpawnForMap(String mapPath){
         // Set spawn using tile coordinates: stageX = col * tileSize, stageY = row * tileSize
         if ("/maps/stage02.txt".equals(mapPath)) {
+            stageX = gp.tileSize * 2;
+            stageY = gp.tileSize * 2;
+            return;
+        }
+        
+        if ("/maps/stage03.txt".equals(mapPath)) {
             stageX = gp.tileSize * 3;
             stageY = gp.tileSize * 11;
             return;
@@ -226,19 +233,19 @@ public class Player extends Entity{
 
                 switch(direction) {
                     case "up":
-                        stageY -= speed;
+                        moveStage(0, -speed);
                         break;
 
                     case "down":
-                        stageY += speed;
+                        moveStage(0, speed);
                         break;
 
                     case "left":
-                        stageX -= speed;
+                        moveStage(-speed, 0);
                         break;
 
                     case "right":
-                        stageX += speed;
+                        moveStage(speed, 0);
                         break;
                 }
             }
@@ -294,11 +301,20 @@ public class Player extends Entity{
             switch(objectName){
                 case "Switch":
                     if (keyH.interactPressed && interactCooldown == 0) {              // E was pressed
-//                        gp.playSE(3);                     // optional sound effect
-//                        gp.ui.showMessage("Light toggled!");
-//                        gp.vignette.setLightOn(true);
-                        gp.vignette.toggleLight();
-                        gp.ui.showMessage("Lights are now on");
+                        if (gp.vignette.wereLightsActivated()) {
+                            gp.ui.showMessage("The switch is already on.\n\n"
+                                    + "We need it to stay on, so don't touch it!");
+                        } else if (!hasReplacementSwitch) {
+                            gp.ui.showMessage("The switch seems to be broken...\n\n"
+                                    + "There should be something here that can fix it.");
+                        } else if (gp.vignette.turnLightsOn()) {
+                            hasReplacementSwitch = false;
+                            gp.ui.showMessage("You replaced the broken switch.\n\n"
+                                    + "Lights are now on.");
+                        } else {
+                            gp.ui.showMessage("The switch is already on.\n\n"
+                                    + "We need it to stay on, so don't touch it!");
+                        }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -310,6 +326,32 @@ public class Player extends Entity{
                     gp.obj[i]=null;
                     gp.ui.showMessage("You got a key!\n\nKeys in bag: " + hasKey);
 
+                    break;
+
+                case "Empty_Table":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        gp.ui.showMessage("You searched the table.\n\n"
+                                + "Nothing useful here.");
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "Key_Table":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        int tableX = gp.obj[i].stageX;
+                        int tableY = gp.obj[i].stageY;
+                        gp.playSE(3);
+                        hasKey++;
+                        gp.obj[i] = new objects.OBJ_Empty_Table();
+                        gp.obj[i].stageX = tableX;
+                        gp.obj[i].stageY = tableY;
+                        gp.ui.showMessage("You searched the table.\n\n"
+                                + "There's a key hidden underneath!\n\n"
+                                + "Keys in bag: " + hasKey);
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
                     break;
 
                 case "DoorStage1":
@@ -327,9 +369,60 @@ public class Player extends Entity{
                     }
                     break;
 
+                case "DoorStage2":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        if(hasKey > 0) {
+                            gp.playSE(3);
+                            hasKey--;
+                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!\n\nEntering a different sized map...");
+                            gp.startMapTransition("/maps/stage03.txt");
+                        } else {
+                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                        }
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "DoorStage3":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        if(hasKey > 0) {
+                            gp.playSE(3);
+                            hasKey--;
+                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!\n\nEntering a different sized map...");
+                            gp.startMapTransition("/maps/stage03.txt");
+                        } else {
+                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                        }
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
                 case "TablePaper":
                     if(keyH.interactPressed && interactCooldown == 0){
-                        gp.ui.showMessage("asdasdasdasda\n\n scaryyyyyyy");
+                        gp.ui.showMessage("Name: Jhon Pork Tocino\n\n"
+                        + "Hmmm...... *turns the page\n\n"
+                        + "Scribles* Scribles* \n\n"
+                        + "This is getting creepy...\n\n"
+                        + "*turns the page\n\n"
+                        + "Ooh something is written at the back part\n\n"
+                        + "\"Idk if someone will eventually read this...\"\n\n" + "I am JPT,,, a student just like you\n\n"
+                        + "\"This place... isnt what u think it is...\n\n"
+                        + "\"I've been studying endlessly just like you, with no sleep at all\"\n\n"
+                        + "\"and then I got to class,, fell asleep,, and when I woke up,, I became trapped here\"\n\n"
+                        + "\"I've been wandering around and...\"\n\n" + "\"there's a few things you should now\"\n\n"
+                        + "\"1. there are shadowy creatures here that wander around, avoid them\"\n\n"
+                        + "\"2. you should check the tables with drawers for items\"\n\n" + "\"you should be able to find some eventually...\"\n\n" + " I hope\"\n\n"
+                        + "\"and lastly... I left some couple of pages here and there to maybe help you\"\n\n"
+                        + "\"...\"\n\n"
+                        + "\"You should read them\"\n\n"
+                        + "\"...\"\n\n"
+                        + "\"Anyways, I was trying to fix the switch here but I forgot where my bag was..\"\n\n so maybe find that first---\n\n"
+                        + "\"The lights...\"\n\n\"they're...\"\n\n\"they're...\"\n\n\"here...\"\n\n"
+                        + "\"Remember...\"\n\n\"AVOID THEM!!!!!\"\n\n"
+                        + "The rest of the page was ripped off with some red paint splots over it...\n\n"
+                        + "... I wonder what happened...");
 
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -337,6 +430,14 @@ public class Player extends Entity{
                     break;
 
                 case "Bag":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        hasReplacementSwitch = true;
+                        gp.obj[i] = null;
+                        gp.ui.showMessage("You searched the bag.\n\n"
+                                + "Inside is a spare switch that might fix the lights.");
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
                     break;
 
             }
@@ -350,6 +451,10 @@ public class Player extends Entity{
                 invincible = true;
             }
         }
+    }
+
+    public void setWalkingVolume(float volume) {
+        walkingSound.setVolume(volume);
     }
 
     public void draw(Graphics2D g2) {

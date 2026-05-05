@@ -38,10 +38,11 @@ public class KeyHandler implements KeyListener {
             if(code == KeyEvent.VK_ENTER) {
                 if(gp.ui.commandNum == 0) {
                     gp.gameState = gp.playState;
-                    gp.playMusic(0);
-                    if(gp.gameState == gp.playState){
-                        gp.ui.showMessage("Woke up* what the fuckkk!!!??\n\n" + "You gotta be kidding me \n\n" + "Im outta here");
-                    }
+                    gp.playMusic(1);
+                    gp.ui.showMessage("woke up*\n\n"
+                            + "what's happening... \n\n"
+                            + "Its so dark...\n\n"
+                            + "where is everybody...");
                 }
                 if(gp.ui.commandNum == 1) {
                     // add later
@@ -75,15 +76,28 @@ public class KeyHandler implements KeyListener {
                 interactPressed = true;
             }
 
-            if(code == KeyEvent.VK_P){
-                if(gp.gameState == gp.playState) {
-                    gp.gameState = gp.pauseState;
-                    gp.pauseMusic();
-                } else if (gp.gameState == gp.pauseState) {
-                    gp.gameState = gp.playState;
-                    gp.resumeMusic();
-                }
+        }
+
+        if(code == KeyEvent.VK_P){
+            if(gp.gameState == gp.playState) {
+                gp.gameState = gp.pauseState;
+                gp.pauseMusic();
+            } else if (gp.gameState == gp.pauseState) {
+                gp.gameState = gp.playState;
+                gp.resumeMusic();
             }
+        }
+
+        if(code == KeyEvent.VK_F11){
+            gp.toggleFullScreen();
+        }
+
+        if(code == KeyEvent.VK_EQUALS || code == KeyEvent.VK_ADD){
+            gp.increaseVolume();
+        }
+
+        if(code == KeyEvent.VK_MINUS || code == KeyEvent.VK_SUBTRACT){
+            gp.decreaseVolume();
         }
     }
 

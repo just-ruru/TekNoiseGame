@@ -1,6 +1,7 @@
 package tile;
 
 import main.GamePanel;
+import main.MapConfig;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -15,13 +16,15 @@ public class TileManager {
     public Tile[] tile;
     public int mapTileNum[][];
     private String currentMapPath = "/maps/stage01.txt";
+    private MapConfig currentMapConfig;
 
     public TileManager(GamePanel gp) {
 
         this.gp = gp;
 
         tile = new Tile[99];
-        mapTileNum = new int[gp.maxStageCol][gp.maxStageRow];
+        currentMapConfig = MapConfig.getConfigForMap(currentMapPath, gp.tileSize);
+        mapTileNum = new int[currentMapConfig.maxStageCol][currentMapConfig.maxStageRow];
 
         getTileImage();
         loadMap(currentMapPath);
@@ -113,6 +116,14 @@ public class TileManager {
     }
     public void loadMap(String mapPath) {
         currentMapPath = mapPath;
+        currentMapConfig = MapConfig.getConfigForMap(mapPath, gp.tileSize);
+        
+        // Resize the map array if needed
+        if (mapTileNum == null || mapTileNum.length != currentMapConfig.maxStageCol || 
+            mapTileNum[0].length != currentMapConfig.maxStageRow) {
+            mapTileNum = new int[currentMapConfig.maxStageCol][currentMapConfig.maxStageRow];
+        }
+        
         try {
             InputStream is = getClass().getResourceAsStream(mapPath);
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -120,15 +131,15 @@ public class TileManager {
             int col = 0;
             int row = 0;
 
-            while (col < gp.maxStageCol && row < gp.maxStageRow) {
+            while (col < currentMapConfig.maxStageCol && row < currentMapConfig.maxStageRow) {
                 String line = br.readLine();
 
                 if (line == null) break; // Guard against short/empty files
 
                 String[] numbers = line.trim().split("\\s+"); // Handles multiple spaces/tabs
 
-                while (col < gp.maxStageCol) {
-                    int num = Integer.parseInt(numbers[col]);
+                while (col < currentMapConfig.maxStageCol) {
+                    int num = parseMapToken(numbers[col], col, row);
 
                     if (num >= 0 && num < tile.length) { // Bounds check against tile[]
                         mapTileNum[col][row] = num;
@@ -139,7 +150,7 @@ public class TileManager {
                     col++;
                 }
 
-                if (col == gp.maxStageCol) {
+                if (col == currentMapConfig.maxStageCol) {
                     col = 0;
                     row++;
                 }
@@ -152,8 +163,25 @@ public class TileManager {
         }
     }
 
+    private int parseMapToken(String token, int col, int row) {
+        if ("X".equalsIgnoreCase(token)) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(token);
+        } catch (NumberFormatException e) {
+            System.out.println("Warning: map marker '" + token + "' at [" + col + "][" + row + "] treated as floor.");
+            return 0;
+        }
+    }
+
     public String getCurrentMapPath() {
         return currentMapPath;
+    }
+    
+    public MapConfig getCurrentMapConfig() {
+        return currentMapConfig;
     }
 
     public void draw(Graphics2D g2) {
@@ -161,7 +189,7 @@ public class TileManager {
         int stageCol = 0;
         int stageRow = 0;
 
-        while(stageCol < gp.maxStageCol && stageRow < gp.maxStageRow) {
+        while(stageCol < currentMapConfig.maxStageCol && stageRow < currentMapConfig.maxStageRow) {
 
             int tileNum = mapTileNum[stageCol][stageRow];
 
@@ -184,7 +212,7 @@ public class TileManager {
             }
             stageCol++;
 
-            if(stageCol == gp.maxStageCol) {
+            if(stageCol == currentMapConfig.maxStageCol) {
                 stageCol = 0;
                 stageRow++;
             }

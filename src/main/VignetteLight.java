@@ -1,79 +1,45 @@
 package main;
 
 import java.awt.*;
-import java.awt.geom.Ellipse2D;
-import java.awt.geom.Area;
-import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
-import java.util.Random;
 
-/**
- * VignetteLight — simulates a dark room with a soft light radius around the player.
- *
- * FEATURES:
- *  - Dark overlay with a radial "torch" cutout centered on the player
- *  - Toggle light ON/OFF (e.g. via OBJ_Switch or key press)
- *  - Flicker effect with configurable intensity and frequency
- *
- * HOW TO USE:
- *  1. Create one instance in your GamePanel (or wherever you manage rendering):
- *       VignetteLight vignette = new VignetteLight(screenWidth, screenHeight);
- *
- *  2. Call vignette.update() every game tick (in your update loop).
- *
- *  3. Call vignette.draw(g2, playerScreenX, playerScreenY) AFTER drawing all tiles/entities.
- *
- *  4. Toggle light:
- *       vignette.setLightOn(true / false);
- *       // or simply:
- *       vignette.toggleLight();
- *
- *  5. Enable flicker:
- *       vignette.setFlicker(true);
- */
 public class VignetteLight {
 
-    // ── Config ────────────────────────────────────────────────────────────────
-    /** Base radius of the light circle around the player (pixels). */
-    private int lightRadius = 60;
+    // VIGNETTE TUNING:
+    // - lightRadius controls how large the character's visible circle is when the room is dark.
+    // - darkness controls how dark the room is when the room lights are off.
+    // - brokenRoomLightDarkness controls the faint overlay when the room lights are on.
+    // - enemyDimAmount controls how much darker the room gets near enemies.
+    // - enemyDimSmoothing controls how softly the enemy dim fades toward its target.
+    // - flickerAmount, flickerChance, and flickerDuration control the character light flicker.
+    private int lightRadius = 75;
+    private float darkness = 0.9f;
+    private float brokenRoomLightDarkness = 0.25f;
+    private final Color darkColor = new Color(0, 0, 0);
+    private Color glowColor = new Color(255, 200, 100, 80);
 
-    /** How dark the unlit area is (0.0 = transparent, 1.0 = pitch black). */
-    public static float darkness = 0.95f;
-
-    /** Color of the dark overlay. */
-    private Color darkColor = new Color(0, 0, 0);
-
-    /** Soft glow colour blended at the edge of the light circle. */
-    private Color glowColor = new Color(255, 200, 100, 80); // warm torch tint
-
-    // ── Flicker ───────────────────────────────────────────────────────────────
-    private boolean flickerEnabled = false;
-
-    /** Max pixels the radius shrinks/grows during a flicker. */
-    private int flickerAmount = 18;
-
-    /** Chance per tick (0-100) that a flicker frame starts. */
-    private int flickerChance = 3;
-
-    /** How many ticks a single flicker lasts. */
-    private int flickerDuration = 6;
-
-    // ── State ─────────────────────────────────────────────────────────────────
-    private boolean lightOn = true;
-    public static boolean roomLight = false;
+    private boolean roomLight = false;
+    private boolean lightsActivated = false;
+    private boolean flickerEnabled = true;
     private int currentRadius;
+
     private int flickerTimer = 0;
     private boolean isFlickering = false;
     private int flickerOffset = 0;
+    private int flickerAmount = 14;
+    private int flickerChance = 3;
+    private int flickerDuration = 6;
+
+    private float enemyDimTarget = 0f;
+    private float enemyDimSmoothing = 0.045f;
+    private float enemyDimProgress = 0f;
+    private float enemyDimAmount = 0.55f;
 
     private final int screenW;
     private final int screenH;
-    private final Random rand = new Random();
+    private final java.util.Random rand = new java.util.Random();
+    private final BufferedImage overlay;
 
-    // Cached image — recreated only when screen size changes
-    private BufferedImage overlay;
-
-    // ─────────────────────────────────────────────────────────────────────────
     public VignetteLight(int screenWidth, int screenHeight) {
         this.screenW = screenWidth;
         this.screenH = screenHeight;
@@ -81,11 +47,10 @@ public class VignetteLight {
         overlay = new BufferedImage(screenW, screenH, BufferedImage.TYPE_INT_ARGB);
     }
 
-    // ── Public API ────────────────────────────────────────────────────────────
-
-    /** Call once per game tick in your update() method. */
     public void update() {
-        if (!lightOn) {
+        updateEnemyProximityDimming();
+
+        if (roomLight && enemyDimTarget <= 0f && enemyDimProgress <= 0.001f) {
             currentRadius = 0;
             return;
         }
@@ -97,129 +62,168 @@ public class VignetteLight {
         }
     }
 
-    /**
-     * Draw the dark vignette overlay.
-     *
-     * @param g2          Graphics2D from your paintComponent / draw method
-     * @param playerScreenX  player's X position on screen (not world coords)
-     * @param playerScreenY  player's Y position on screen (not world coords)
-     */
     public void draw(Graphics2D g2, int playerScreenX, int playerScreenY, int playerWidth, int playerHeight) {
-        // Center the light on the player's center (adjust 24 to half your tile/sprite size)
-        int cx = playerScreenX + 24;
-        int cy = playerScreenY + 40;
+        int cx = playerScreenX + playerWidth / 2;
+        int cy = playerScreenY + playerHeight - 3;
 
-        // ── Build overlay ────────────────────────────────────────────────────
         Graphics2D og = overlay.createGraphics();
         og.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-        // 1. Fill everything black (with darkness alpha)
         og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC));
+
+        float currentDarkness = roomLight ? brokenRoomLightDarkness : darkness;
+        float easedEnemyDim = smoothStep(enemyDimProgress);
+        if (easedEnemyDim > 0f) {
+            currentDarkness = Math.min(1f, currentDarkness + easedEnemyDim * enemyDimAmount);
+        }
+
         og.setColor(new Color(
                 darkColor.getRed(),
                 darkColor.getGreen(),
                 darkColor.getBlue(),
-                (int)(darkness * 255)));
+                Math.round(currentDarkness * 255)));
         og.fillRect(0, 0, screenW, screenH);
 
-        if (lightOn && currentRadius > 0) {
-            // 2. Cut out a transparent circle where the light is
+        if ((!roomLight || enemyDimProgress > 0f) && currentRadius > 0) {
             og.setComposite(AlphaComposite.getInstance(AlphaComposite.DST_OUT));
             drawLightCircle(og, cx, cy, currentRadius);
 
-            // 3. Add warm glow ring on top (DST_ATOP blends only inside the cutout edge)
             og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER));
             drawGlowRing(og, cx, cy, currentRadius);
         }
 
         og.dispose();
 
-        // ── Composite overlay onto game screen ───────────────────────────────
         Composite old = g2.getComposite();
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1.0f));
         g2.drawImage(overlay, 0, 0, null);
         g2.setComposite(old);
     }
 
-    // ── Light toggle ──────────────────────────────────────────────────────────
+    public boolean turnLightsOn() {
+        if (lightsActivated) {
+            return false;
+        }
 
-    /** Turn the light on or off. */
-    public void setLightOn(boolean on) {
-        this.lightOn = on;
-        if (!on) flickerTimer = 0;
+        lightsActivated = true;
+        roomLight = true;
+        flickerEnabled = true;
+        isFlickering = true;
+        flickerTimer = 0;
+        currentRadius = 60;
+        return true;
     }
 
-    /** Toggle between on and off. */
-    public void toggleLight() {
-
-        if(lightOn == true){
-            darkness = 0;
-        }else if(lightOn == false) {
-            darkness = 0.95f;
-        };
-        lightOn = !lightOn;
+    public boolean areRoomLightsOn() {
+        return roomLight;
     }
 
-    public boolean isLightOn() { return lightOn; }
+    public boolean wereLightsActivated() {
+        return lightsActivated;
+    }
 
-    // ── Flicker ───────────────────────────────────────────────────────────────
+    public void triggerEnemyProximityDim() {
+        setEnemyProximityLevel(1f);
+    }
 
-    public void setFlicker(boolean enabled) { this.flickerEnabled = enabled; }
-    public boolean isFlickerEnabled()        { return flickerEnabled; }
+    public void setEnemyNearby(boolean nearby) {
+        setEnemyProximityLevel(nearby ? 1f : 0f);
+    }
 
-    // ── Customisation helpers ─────────────────────────────────────────────────
+    public void setEnemyProximityLevel(float level) {
+        this.enemyDimTarget = Math.max(0f, Math.min(1f, level));
+    }
 
-    public void setLightRadius(int radius)    { this.lightRadius = radius; }
-    public void setDarkness(float darkness)   { this.darkness = Math.max(0f, Math.min(1f, darkness)); }
-    public void setDarkColor(Color c)         { this.darkColor = c; }
-    public void setGlowColor(Color c)         { this.glowColor = c; }
-    public void setFlickerAmount(int px)      { this.flickerAmount = px; }
-    public void setFlickerChance(int pct)     { this.flickerChance = pct; }
-    public void setFlickerDuration(int ticks) { this.flickerDuration = ticks; }
+    public void setLightRadius(int radius) {
+        this.lightRadius = Math.max(1, radius);
+        this.currentRadius = this.lightRadius;
+    }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    public void setDarkness(float darkness) {
+        this.darkness = Math.max(0f, Math.min(1f, darkness));
+    }
+
+    public void setBrokenRoomLightDarkness(float darkness) {
+        this.brokenRoomLightDarkness = Math.max(0f, Math.min(1f, darkness));
+    }
+
+    public void setGlowColor(Color c) {
+        this.glowColor = c;
+    }
+
+    public void setFlicker(boolean enabled) {
+        this.flickerEnabled = enabled;
+    }
+
+    public void setFlickerAmount(int px) {
+        this.flickerAmount = Math.max(0, px);
+    }
+
+    public void setFlickerChance(int pct) {
+        this.flickerChance = Math.max(0, Math.min(100, pct));
+    }
+
+    public void setFlickerDuration(int ticks) {
+        this.flickerDuration = Math.max(1, ticks);
+    }
+
+    public void setEnemyDimAmount(float amount) {
+        this.enemyDimAmount = Math.max(0f, Math.min(1f, amount));
+    }
+
+    public void setEnemyDimTransitionTicks(int ticks) {
+        this.enemyDimSmoothing = Math.max(0.005f, Math.min(1f, 1f / Math.max(1, ticks)));
+    }
+
+    private void updateEnemyProximityDimming() {
+        enemyDimProgress += (enemyDimTarget - enemyDimProgress) * enemyDimSmoothing;
+
+        if (Math.abs(enemyDimTarget - enemyDimProgress) < 0.001f) {
+            enemyDimProgress = enemyDimTarget;
+        }
+    }
+
+    private float smoothStep(float value) {
+        float clamped = Math.max(0f, Math.min(1f, value));
+        return clamped * clamped * (3f - 2f * clamped);
+    }
 
     private void updateFlicker() {
         if (isFlickering) {
             flickerTimer--;
+            currentRadius = Math.max(1, lightRadius - Math.abs(flickerOffset));
+
             if (flickerTimer <= 0) {
                 isFlickering = false;
                 flickerOffset = 0;
                 currentRadius = lightRadius;
             }
-            // radius shrinks during flicker
-            currentRadius = lightRadius - Math.abs(flickerOffset);
-        } else {
-            currentRadius = lightRadius;
-            // random chance to start a flicker
-            if (rand.nextInt(100) < flickerChance) {
-                isFlickering = true;
-                flickerTimer = flickerDuration;
-                flickerOffset = rand.nextInt(flickerAmount * 2) - flickerAmount;
-            }
+            return;
+        }
+
+        currentRadius = lightRadius;
+        if (flickerAmount > 0 && rand.nextInt(100) < flickerChance) {
+            isFlickering = true;
+            flickerTimer = flickerDuration;
+            flickerOffset = rand.nextInt(flickerAmount * 2 + 1) - flickerAmount;
         }
     }
 
-    /** Radial gradient cutout — soft edge so darkness fades naturally. */
     private void drawLightCircle(Graphics2D g, int cx, int cy, int radius) {
-        // Use a radial gradient: fully transparent at centre → fully opaque at edge
-        // (DST_OUT makes opaque = cut out, so centre becomes visible)
         RadialGradientPaint rgp = new RadialGradientPaint(
                 new Point(cx, cy),
                 radius,
                 new float[]{0.0f, 0.65f, 1.0f},
                 new Color[]{
-                        new Color(0, 0, 0, 255),  // full cut-out at centre
-                        new Color(0, 0, 0, 220),  // mostly cut-out mid-range
-                        new Color(0, 0, 0, 0)     // fades to nothing at edge
+                        new Color(0, 0, 0, 255),
+                        new Color(0, 0, 0, 220),
+                        new Color(0, 0, 0, 0)
                 });
         g.setPaint(rgp);
         g.fillOval(cx - radius, cy - radius, radius * 2, radius * 2);
     }
 
-    /** Warm glow ring blended at the boundary of the light. */
     private void drawGlowRing(Graphics2D g, int cx, int cy, int radius) {
-        int glowRadius = (int)(radius * 1.15f);
+        int glowRadius = (int) (radius * 1.15f);
         RadialGradientPaint glow = new RadialGradientPaint(
                 new Point(cx, cy),
                 glowRadius,

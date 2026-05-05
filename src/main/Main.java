@@ -12,6 +12,7 @@ public class Main {
     window.setTitle("TekNoise Game");
 
     GamePanel gamePanel = new GamePanel();
+    gamePanel.setWindow(window);
     window.add(gamePanel);
 
     window.pack();
@@ -21,7 +22,6 @@ public class Main {
 
     gamePanel.setupGame();
     gamePanel.startGameThread();
-
 
     }
 }
