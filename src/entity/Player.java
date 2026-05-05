@@ -447,6 +447,7 @@ public class Player extends Entity{
     public void contactMonster(int i){
         if(i != 999){
             if(invincible == false) {
+                gp.playSE(7);
                 life -= 1;
                 invincible = true;
             }
@@ -524,6 +525,15 @@ public class Player extends Entity{
                 }
                 break;
         }
+
+        // Flickering effect during invincibility - must be set BEFORE drawing
+        if(invincible == true) {
+            // Flicker every 5 frames (creates a visible blinking effect)
+            if(invincibleCounter % 10 < 5) {
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
+            }
+        }
+
         switch(choice) {
             case 1:
                 g2.drawImage(image, screenX, screenY, 25 * 2, 40 * 2, null);
@@ -543,11 +553,6 @@ public class Player extends Entity{
             default:
                 break;
         }
-
-        if(invincible == true) {
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
-        }
-
 
         //reset alpha
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));

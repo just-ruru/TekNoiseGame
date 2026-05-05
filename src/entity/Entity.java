@@ -9,7 +9,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 
 public class Entity {
-    GamePanel gp;
+    public GamePanel gp;
     public int stageX, stageY;
     public float speed;
     private float moveRemainderX = 0f;
