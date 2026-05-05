@@ -3,12 +3,16 @@ package main;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
+import javax.sound.sampled.FloatControl;
 import java.net.URL;
 
 public class Sound {
 
-    Clip clip;
+    public Clip clip;
     URL soundURL[] = new URL[30];
+    private int pausedFrame = 0;
+    private boolean wasLooping = false;
+    private float volume = 1f;
 
     public Sound() {
 
@@ -17,6 +21,8 @@ public class Sound {
         soundURL[2] = getClass().getResource("/sound/General_Feedback.wav");
         soundURL[3] = getClass().getResource("/sound/Item_Collection.wav");
         soundURL[4] = getClass().getResource("/sound/Door_Open.wav");
+        soundURL[5] = getClass().getResource("/sound/Walking.wav");
+        soundURL[6] = getClass().getResource("/sound/phantomvoice.wav");
     }
 
     public void setFile(int i) {
@@ -24,6 +30,7 @@ public class Sound {
             AudioInputStream ais = AudioSystem.getAudioInputStream(soundURL[i]);
             clip = AudioSystem.getClip();
             clip.open(ais);
+            applyVolume();
 
         }catch(Exception e) {
 
@@ -32,15 +39,61 @@ public class Sound {
 
     public void play() {
 
+        if (clip == null) return;
         clip.start();
     }
 
     public void loop() {
 
+        if (clip == null) return;
+        wasLooping = true;
         clip.loop(Clip.LOOP_CONTINUOUSLY);
     }
 
     public void stop() {
+        if (clip == null) return;
         clip.stop();
+        pausedFrame = 0;
+        wasLooping = false;
+    }
+
+    public void pause() {
+        if (clip == null) return;
+        if (!clip.isRunning()) return;
+
+        pausedFrame = clip.getFramePosition();
+        clip.stop();
+    }
+
+    public void resume() {
+        if (clip == null) return;
+
+        if (pausedFrame > 0) {
+            clip.setFramePosition(pausedFrame);
+        }
+        clip.start();
+        if (wasLooping) {
+            clip.loop(Clip.LOOP_CONTINUOUSLY);
+        }
+    }
+
+    public void setVolume(float volume) {
+        this.volume = Math.max(0f, Math.min(1f, volume));
+        applyVolume();
+    }
+
+    public float getVolume() {
+        return volume;
+    }
+
+    private void applyVolume() {
+        if (clip == null) return;
+        if (!clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) return;
+
+        FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
+        float clampedVolume = Math.max(0.0001f, Math.min(1f, volume));
+        float decibels = (float) (20.0 * Math.log10(clampedVolume));
+        decibels = Math.max(gainControl.getMinimum(), Math.min(gainControl.getMaximum(), decibels));
+        gainControl.setValue(decibels);
     }
 }
