@@ -75,7 +75,7 @@ public class CollisionChecker {
                     entity.collisionOn = true;
                     break;
                 }
-                tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityTopRow];
+                tileNum1 = gp.tileM.mapTileNum[entityRightCol][entityTopRow];
                 tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityBottomRow];
                 if (gp.tileM.tile[tileNum1].collision == true || gp.tileM.tile[tileNum2].collision == true) {
                     entity.collisionOn = true;

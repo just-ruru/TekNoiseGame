@@ -2,6 +2,8 @@ package entity;
 
 import main.GamePanel;
 import main.KeyHandler;
+import main.monster.MON_MinionWitherSlime;
+import npc.NPC_JhonPorkJerkyJake;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -29,6 +31,7 @@ public class Player extends Entity{
     private int exhaustedTicksRemaining = 0;
     private int sprintCooldownTicksRemaining = 0;
     private int staminaRegenCounter = 0;
+    private int controlsInvertedTicks = 0;
 
     public final int screenX;
     public final int screenY;
@@ -229,33 +232,47 @@ public class Player extends Entity{
         if (axeDoorCooldownTicks > 0) {
             axeDoorCooldownTicks--;
         }
+        if (controlsInvertedTicks > 0) {
+            controlsInvertedTicks--;
+        }
 
         boolean moving = keyH.isUpPressed || keyH.isDownPressed || keyH.isLeftPressed || keyH.isRightPressed;
         updateSprintState(moving);
 
         if(moving){
 
-            if(keyH.isUpPressed == true){
+            boolean upPressed = controlsInvertedTicks > 0 ? keyH.isDownPressed : keyH.isUpPressed;
+            boolean downPressed = controlsInvertedTicks > 0 ? keyH.isUpPressed : keyH.isDownPressed;
+            boolean leftPressed = controlsInvertedTicks > 0 ? keyH.isRightPressed : keyH.isLeftPressed;
+            boolean rightPressed = controlsInvertedTicks > 0 ? keyH.isLeftPressed : keyH.isRightPressed;
+
+            if(upPressed == true){
                 direction = "up";
-            } else if (keyH.isDownPressed == true) {
+            } else if (downPressed == true) {
                 direction = "down";
-            } else if (keyH.isLeftPressed == true) {
+            } else if (leftPressed == true) {
                 direction = "left";
-            } else if (keyH.isRightPressed == true) {
+            } else if (rightPressed == true) {
                 direction = "right";
             }
 
             // CHECK TILE COLLISION
             collisionOn = false;
-            gp.cChecker.checkTile(this);
+            if (!gp.devSettings.isPhaseThroughWallsEnabled()) {
+                gp.cChecker.checkTile(this);
+            }
 
             //CHECK OBJ COLLISION
-            int objIndex = gp.cChecker.checkObject(this, true);
-            pickUpObject(objIndex);
+            if (!gp.devSettings.isPhaseThroughWallsEnabled()) {
+                int objIndex = gp.cChecker.checkObject(this, true);
+                pickUpObject(objIndex);
+            }
 
             //CHECK MONSTER COLLISION
-            int monsterIndex = gp.cChecker.checkEntity(this, gp.monster);
-            contactMonster(monsterIndex);
+            if (!gp.devSettings.isPhaseThroughWallsEnabled()) {
+                int monsterIndex = gp.cChecker.checkEntity(this, gp.monster);
+                contactMonster(monsterIndex);
+            }
 
             // IF COLLISION IS FALSE, PLAYER CAN MOVE
             if(collisionOn == false) {
@@ -469,9 +486,13 @@ public class Player extends Entity{
                             gp.ui.showMessage("I need a moment before swinging the axe again.");
                         } else {
                             gp.playSE(3);
+                            int breakableRow = gp.obj[i].stageY / gp.tileSize;
                             gp.obj[i] = null;
                             axeTableCooldownTicks = AXE_TABLE_COOLDOWN_TICKS;
                             gp.ui.showMessage("You break the table apart with the axe.");
+                            if (isStage("/maps/stage02.txt") && breakableRow == 16) {
+                                gp.triggerStage2BossIntroFromBreakable();
+                            }
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -494,6 +515,24 @@ public class Player extends Entity{
                 case "Candle":
                     if (keyH.interactPressed && interactCooldown == 0) {
                         gp.handleCandleInteraction((objects.OBJ_Candle) gp.obj[i]);
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "JhonPorkJerkyJake":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        NPC_JhonPorkJerkyJake npc = (NPC_JhonPorkJerkyJake) gp.obj[i];
+                        if (gp.isCandlePuzzleSolved()) {
+                            gp.ui.showMessage("Jhon Pork Tocino: Thank you...\n\n"
+                                    + "The light is back.\n\n"
+                                    + "Jerky Jake and I can finally move on.");
+                            npc.startFade();
+                        } else {
+                            gp.ui.showMessage("Jhon Pork Tocino: Please, help us bring the light back.\n\n"
+                                    + "Jerky Jake is trapped with me, and the phantoms are getting closer.\n\n"
+                                    + "Find the candle puzzle and light it correctly.");
+                        }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -640,6 +679,17 @@ public class Player extends Entity{
 
     public void contactMonster(int i){
         if(i != 999){
+            if (gp.monster[i] instanceof MON_MinionWitherSlime) {
+                ((MON_MinionWitherSlime) gp.monster[i]).hitPlayer();
+                return;
+            }
+            if (gp.monster[i] != null && gp.monster[i].type != 1) {
+                return;
+            }
+            if (gp.devSettings.isUnlimitedHealthEnabled()) {
+                life = maxLife;
+                return;
+            }
             if(invincible == false) {
                 gp.playSE(7);
                 life -= 1;
@@ -740,6 +790,10 @@ public class Player extends Entity{
 
     public boolean isAxeDoorCooldownActive() {
         return axeDoorCooldownTicks > 0;
+    }
+
+    public void setControlsInvertedTicks(int ticks) {
+        controlsInvertedTicks = Math.max(controlsInvertedTicks, ticks);
     }
 
     public void draw(Graphics2D g2) {

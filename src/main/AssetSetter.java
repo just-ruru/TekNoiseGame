@@ -1,6 +1,8 @@
 package main;
 
 import main.monster.MON_Dementor;
+import main.monster.MON_Stage2WitherBoss;
+import npc.NPC_JhonPorkJerkyJake;
 import objects.OBJ_Bag;
 import objects.OBJ_LightSwitch;
 import objects.OBJ_TablePaper;
@@ -126,6 +128,8 @@ public class AssetSetter {
                         objectIndex = addObject(objectIndex, new OBJ_HealthBag(), col, row);
                     } else if ("A".equalsIgnoreCase(token)) {
                         objectIndex = addObject(objectIndex, new OBJ_Axe(), col, row);
+                    } else if ("J".equalsIgnoreCase(token)) {
+                        objectIndex = addObject(objectIndex, new NPC_JhonPorkJerkyJake(), col, row);
                     } else if ("N".equalsIgnoreCase(token)) {
                         candleTiles.add(new Point(col, row));
                     }
@@ -245,13 +249,38 @@ public class AssetSetter {
     }
 
     private void setStage02Monsters() {
-        gp.monster[0] = new MON_Dementor(gp, 2);
-        gp.monster[0].stageX = gp.tileSize * 16;
-        gp.monster[0].stageY = gp.tileSize * 8;
+        Point bossTile = findMapMarker("/maps/stage02.txt", "S");
+        if (bossTile == null) {
+            System.out.println("Warning: stage02 boss marker S not found.");
+            return;
+        }
 
-        gp.monster[1] = new MON_Dementor(gp, 3);
-        gp.monster[1].stageX = gp.tileSize * 31;
-        gp.monster[1].stageY = gp.tileSize * 12;
+        gp.monster[0] = new MON_Stage2WitherBoss(gp);
+        gp.monster[0].stageX = gp.tileSize * bossTile.x;
+        gp.monster[0].stageY = gp.tileSize * bossTile.y;
+    }
+
+    private Point findMapMarker(String mapPath, String marker) {
+        try {
+            InputStream is = getClass().getResourceAsStream(mapPath);
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            String line;
+            int row = 0;
+            while ((line = br.readLine()) != null) {
+                String[] tokens = line.trim().split("\\s+");
+                for (int col = 0; col < tokens.length; col++) {
+                    if (marker.equalsIgnoreCase(tokens[col])) {
+                        br.close();
+                        return new Point(col, row);
+                    }
+                }
+                row++;
+            }
+            br.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 
     private void setStage03Monsters() {

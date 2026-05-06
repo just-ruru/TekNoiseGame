@@ -20,6 +20,7 @@ public class VignetteLight {
     private Color glowColor = new Color(255, 200, 100, 80);
 
     private boolean roomLight = false;
+    private boolean devRoomLightsOn = false;
     private boolean lightsActivated = false;
     private boolean flickerEnabled = true;
     private int currentRadius;
@@ -57,7 +58,7 @@ public class VignetteLight {
     public void update() {
         updateEnemyProximityDimming();
 
-        if (roomLight && enemyDimTarget <= 0f && enemyDimProgress <= 0.001f) {
+        if (isRoomLightVisible() && enemyDimTarget <= 0f && enemyDimProgress <= 0.001f) {
             currentRadius = 0;
             return;
         }
@@ -77,10 +78,11 @@ public class VignetteLight {
         og.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC));
 
-        float currentDarkness = roomLight ? brokenRoomLightDarkness : darkness;
+        boolean roomLightVisible = isRoomLightVisible();
+        float currentDarkness = roomLightVisible ? brokenRoomLightDarkness : darkness;
         float easedEnemyDim = smoothStep(enemyDimProgress);
         if (easedEnemyDim > 0f) {
-            if (roomLight) {
+            if (roomLightVisible) {
                 currentDarkness = lerp(brokenRoomLightDarkness, roomLightEnemyDarkness, easedEnemyDim);
             } else {
                 currentDarkness = Math.min(1f, currentDarkness + easedEnemyDim * enemyDimAmount);
@@ -95,9 +97,9 @@ public class VignetteLight {
         og.fillRect(0, 0, screenW, screenH);
 
         int radiusToDraw = currentRadius;
-        if ((!roomLight || easedEnemyDim > 0f) && radiusToDraw > 1) {
+        if ((!roomLightVisible || easedEnemyDim > 0f) && radiusToDraw > 1) {
             Composite lightComposite = og.getComposite();
-            float lightAlpha = roomLight ? easedEnemyDim : 1f;
+            float lightAlpha = roomLightVisible ? easedEnemyDim : 1f;
 
             og.setComposite(AlphaComposite.getInstance(AlphaComposite.DST_OUT, lightAlpha));
             drawLightCircle(og, cx, cy, radiusToDraw);
@@ -131,7 +133,15 @@ public class VignetteLight {
     }
 
     public boolean areRoomLightsOn() {
-        return roomLight;
+        return isRoomLightVisible();
+    }
+
+    public void setDevRoomLightsOn(boolean devRoomLightsOn) {
+        this.devRoomLightsOn = devRoomLightsOn;
+    }
+
+    private boolean isRoomLightVisible() {
+        return roomLight || devRoomLightsOn;
     }
 
     public boolean wereLightsActivated() {

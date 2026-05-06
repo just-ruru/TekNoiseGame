@@ -20,6 +20,10 @@ public class KeyHandler implements KeyListener {
     public void keyPressed(KeyEvent e) {
         int code = e.getKeyCode();
 
+        if (gp.devSettings.handleKeyPressed(code)) {
+            return;
+        }
+
         // TITLE STATE
         if (gp.gameState == gp.titleState) {
 

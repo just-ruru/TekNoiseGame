@@ -170,6 +170,7 @@ public class TileManager {
                 "H".equalsIgnoreCase(token) ||
                 "J".equalsIgnoreCase(token) ||
                 "N".equalsIgnoreCase(token) ||
+                "S".equalsIgnoreCase(token) ||
                 "X".equalsIgnoreCase(token)) {
             return 0;
         }

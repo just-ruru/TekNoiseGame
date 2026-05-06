@@ -2,6 +2,9 @@ package main;
 
 import entity.Entity;
 import entity.Player;
+import main.monster.MON_MinionWitherSlime;
+import main.monster.MON_Stage2WitherBoss;
+import npc.NPC_JhonPorkJerkyJake;
 import objects.SuperObject;
 import tile.TileManager;
 
@@ -66,6 +69,7 @@ public class GamePanel extends JPanel implements Runnable{
     public CollisionChecker cChecker = new CollisionChecker(this);
     public AssetSetter assetSetter = new AssetSetter(this);
     public UI ui = new UI(this);
+    public DevSettings devSettings = new DevSettings(this);
 
     Thread gameThread;
 
@@ -102,6 +106,7 @@ public class GamePanel extends JPanel implements Runnable{
     private static final int CUTSCENE_HOLD_TICKS = 45;
     private static final int CUTSCENE_NONE = 0;
     private static final int CUTSCENE_STAGE1_LIGHTS_TO_DOOR = 1;
+    private static final int CUTSCENE_STAGE2_BOSS_INTRO = 2;
     private static final int CUTSCENE_PHASE_PAN_TO_TARGET = 0;
     private static final int CUTSCENE_PHASE_WAIT_FOR_DIALOGUE = 1;
     private static final int CUTSCENE_PHASE_RETURN_TO_PLAYER = 2;
@@ -111,10 +116,12 @@ public class GamePanel extends JPanel implements Runnable{
     private float cutsceneTargetStageX;
     private float cutsceneTargetStageY;
     private boolean stage01DoorRevealPlayed = false;
+    private boolean stage02BossIntroPlayed = false;
+    private boolean stage02BossActivated = false;
+    private int minionEffectTicks = 0;
     private final int[] candleSequence = {1, 4, 2, 3};
-    private int candleSequenceIndex = 0;
+    private final java.util.List<Integer> litCandleOrder = new ArrayList<>();
     private boolean candlePuzzleSolved = false;
-    private boolean candleManualResetRequired = false;
 
     int playerX = player.stageX;
     int playerY = player.stageY;
@@ -126,6 +133,7 @@ public class GamePanel extends JPanel implements Runnable{
         this.setDoubleBuffered(true);
         this.addKeyListener(keyH);
         this.setFocusable(true);
+        this.setFocusTraversalKeysEnabled(false);
 
         // Initialize map config based on default map
         currentMapConfig = MapConfig.getConfigForMap(currentMapPath, tileSize);
@@ -261,6 +269,8 @@ public class GamePanel extends JPanel implements Runnable{
         // Stage start: keys are per-stage and shouldn't carry over.
         resetStageThoughtState();
         stage01DoorRevealPlayed = false;
+        stage02BossIntroPlayed = false;
+        stage02BossActivated = false;
         activeCutscene = CUTSCENE_NONE;
         resetCandlePuzzleState();
         player.hasKey = 0;
@@ -286,13 +296,19 @@ public class GamePanel extends JPanel implements Runnable{
             interactCooldown--;
         }
         if(gameState == playState) {
+            devSettings.applyContinuousEffects();
+            updateTemporaryEffects();
             player.update();
             updateCameraFollowPlayer();
+            updateStageObjects();
 
             if (!ui.isDialogueActive()) {
                 for(int i = 0; i < monster.length; i++) {
                     if(monster[i] != null) {
                         monster[i].update();
+                        if (monster[i] != null && monster[i].removeFromWorld) {
+                            monster[i] = null;
+                        }
                     }
                 }
 
@@ -348,8 +364,21 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     private void updateCutscene() {
+        updateCutsceneEntityAnimations();
+
         if (activeCutscene == CUTSCENE_STAGE1_LIGHTS_TO_DOOR) {
             updateStage1DoorRevealCutscene();
+        }
+        if (activeCutscene == CUTSCENE_STAGE2_BOSS_INTRO) {
+            updateStage2BossIntroCutscene();
+        }
+    }
+
+    private void updateCutsceneEntityAnimations() {
+        for (Entity entity : monster) {
+            if (entity != null) {
+                entity.updateAnimationOnly();
+            }
         }
     }
 
@@ -391,6 +420,13 @@ public class GamePanel extends JPanel implements Runnable{
         int nearestEnemyDistanceSquared = Integer.MAX_VALUE;
         float enemyProximityLevel = 0f;
         float enemyFlickerLevel = 0f;
+
+        if (minionEffectTicks > 0) {
+            vignette.setEnemyProximityLevel(1f);
+            vignette.setEnemyFlickerLevel(1f);
+            updatePhantomVoice(phantomVoiceMaxVolume);
+            return;
+        }
 
         for (int i = 0; i < monster.length; i++) {
             if (monster[i] == null) {
@@ -520,6 +556,8 @@ public class GamePanel extends JPanel implements Runnable{
                 player.hasKey = 0; // keys are per-stage
                 player.hasReplacementSwitch = false; // repair parts are per-stage
                 resetCandlePuzzleState();
+                stage02BossIntroPlayed = false;
+                stage02BossActivated = false;
                 assetSetter.setObject(currentMapPath);
                 assetSetter.setMonster(currentMapPath);
 
@@ -545,6 +583,38 @@ public class GamePanel extends JPanel implements Runnable{
         gameState = transitionState;
     }
 
+    public void loadStageForTesting(String mapPath) {
+        if (!DevSettings.TEST_MODE) {
+            return;
+        }
+
+        currentMapPath = mapPath;
+        nextMapPath = null;
+        fadeAlpha = 0f;
+        fadeOutPhase = true;
+
+        tileM.loadMap(currentMapPath);
+        currentMapConfig = tileM.getCurrentMapConfig();
+        updateWorldDimensions();
+
+        resetStageThoughtState();
+        resetCandlePuzzleState();
+        stage02BossIntroPlayed = false;
+        stage02BossActivated = false;
+        activeCutscene = CUTSCENE_NONE;
+
+        int currentLife = player.life;
+        player.setDefaultValues();
+        player.life = devSettings.isUnlimitedHealthEnabled()
+                ? player.maxLife
+                : Math.max(1, Math.min(currentLife, player.maxLife));
+        player.setSpawnForMap(currentMapPath);
+        snapCameraToPlayer();
+        assetSetter.setObject(currentMapPath);
+        assetSetter.setMonster(currentMapPath);
+        gameState = playState;
+    }
+
     public String getCurrentMapPath() {
         return currentMapPath;
     }
@@ -555,6 +625,35 @@ public class GamePanel extends JPanel implements Runnable{
 
     public int getCameraStageY() {
         return Math.round(cameraStageY);
+    }
+
+    public boolean isPathTileBlocked(int col, int row) {
+        if (col < 0 || row < 0 || col >= maxStageCol || row >= maxStageRow) {
+            return true;
+        }
+
+        int tileNum = tileM.mapTileNum[col][row];
+        if (tileM.tile[tileNum] == null || tileM.tile[tileNum].collision) {
+            return true;
+        }
+
+        Rectangle tileArea = new Rectangle(col * tileSize, row * tileSize, tileSize, tileSize);
+        for (SuperObject object : obj) {
+            if (object == null || !object.collision) {
+                continue;
+            }
+
+            Rectangle objectArea = new Rectangle(
+                    object.stageX + object.solidArea.x,
+                    object.stageY + object.solidArea.y,
+                    object.solidArea.width,
+                    object.solidArea.height);
+            if (tileArea.intersects(objectArea)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public void startStage1DoorRevealCutscene() {
@@ -578,6 +677,117 @@ public class GamePanel extends JPanel implements Runnable{
         gameState = cutsceneState;
     }
 
+    public void triggerStage2BossIntroFromBreakable() {
+        if (stage02BossIntroPlayed || !"/maps/stage02.txt".equals(currentMapPath)) {
+            return;
+        }
+        startStage2BossIntroCutscene();
+    }
+
+    private void startStage2BossIntroCutscene() {
+        Entity boss = findStage2Boss();
+        if (boss == null) {
+            stage02BossIntroPlayed = true;
+            return;
+        }
+
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+        cutsceneTargetStageX = boss.stageX;
+        cutsceneTargetStageY = boss.stageY;
+        cutsceneHoldTicks = CUTSCENE_HOLD_TICKS;
+        activeCutscene = CUTSCENE_STAGE2_BOSS_INTRO;
+        cutscenePhase = CUTSCENE_PHASE_PAN_TO_TARGET;
+        stage02BossIntroPlayed = true;
+        gameState = cutsceneState;
+    }
+
+    private void updateStage2BossIntroCutscene() {
+        if (cutscenePhase == CUTSCENE_PHASE_PAN_TO_TARGET) {
+            if (moveCameraToward(cutsceneTargetStageX, cutsceneTargetStageY, CAMERA_PAN_SPEED)) {
+                if (cutsceneHoldTicks > 0) {
+                    cutsceneHoldTicks--;
+                } else {
+                    ui.showMessage("Something stirs in the dark...");
+                    cutscenePhase = CUTSCENE_PHASE_WAIT_FOR_DIALOGUE;
+                }
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_PHASE_WAIT_FOR_DIALOGUE) {
+            if (!ui.isDialogueActive()) {
+                activateStage2Boss();
+                cutscenePhase = CUTSCENE_PHASE_RETURN_TO_PLAYER;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_PHASE_RETURN_TO_PLAYER) {
+            if (moveCameraToward(player.stageX, player.stageY, CAMERA_PAN_SPEED)) {
+                activeCutscene = CUTSCENE_NONE;
+                gameState = playState;
+            }
+        }
+    }
+
+    private Entity findStage2Boss() {
+        for (Entity entity : monster) {
+            if (entity instanceof MON_Stage2WitherBoss) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
+    private void activateStage2Boss() {
+        if (stage02BossActivated) {
+            return;
+        }
+
+        Entity boss = findStage2Boss();
+        if (boss instanceof MON_Stage2WitherBoss) {
+            ((MON_Stage2WitherBoss) boss).activate();
+            stage02BossActivated = true;
+        }
+    }
+
+    public void spawnStage2Minions(int sourceX, int sourceY, int count) {
+        for (int spawned = 0; spawned < count; spawned++) {
+            int slot = findFreeMonsterSlot();
+            if (slot == -1) {
+                return;
+            }
+
+            MON_MinionWitherSlime minion = new MON_MinionWitherSlime(this);
+            minion.stageX = sourceX + ((spawned % 3) - 1) * tileSize;
+            minion.stageY = sourceY + ((spawned / 3) + 1) * tileSize;
+            monster[slot] = minion;
+        }
+    }
+
+    private int findFreeMonsterSlot() {
+        for (int i = 0; i < monster.length; i++) {
+            if (monster[i] == null) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public void applyStage2MinionHitEffect() {
+        minionEffectTicks = 180;
+        player.setControlsInvertedTicks(180);
+        vignette.setEnemyProximityLevel(1f);
+        vignette.setEnemyFlickerLevel(1f);
+    }
+
+    private void updateTemporaryEffects() {
+        if (minionEffectTicks > 0) {
+            minionEffectTicks--;
+        }
+    }
+
     private SuperObject findObjectByName(String objectName) {
         for (SuperObject object : obj) {
             if (object != null && objectName.equals(object.name)) {
@@ -595,46 +805,50 @@ public class GamePanel extends JPanel implements Runnable{
 
         if (candle.isLit()) {
             candle.turnOff();
-            if (areAllCandlesOff()) {
-                candleSequenceIndex = 0;
-                candleManualResetRequired = false;
-                ui.showMessage("All candles are out.\n\nThe sequence can be started again.");
-            } else {
-                candleManualResetRequired = true;
-                ui.showMessage("The candle goes out.\n\nTurn all candles off to restart the sequence.");
-            }
-            return;
-        }
-
-        if (candleManualResetRequired) {
-            ui.showMessage("Turn all candles off first.\n\nThen start the sequence again.");
-            return;
-        }
-
-        int expectedCandle = candleSequence[candleSequenceIndex];
-        if (candle.getCandleNumber() != expectedCandle) {
-            turnOffAllCandles();
-            candleSequenceIndex = 0;
-            candleManualResetRequired = false;
-            ui.showMessage("The flames shudder and die.\n\nThat was the wrong order.");
+            litCandleOrder.remove(Integer.valueOf(candle.getCandleNumber()));
+            ui.showMessage("The candle goes out.");
             return;
         }
 
         candle.setLit(true);
-        candleSequenceIndex++;
+        litCandleOrder.add(candle.getCandleNumber());
 
-        if (candleSequenceIndex >= candleSequence.length) {
+        if (!areAllCandlesLit()) {
+            ui.showMessage("The candle catches flame.");
+            return;
+        }
+
+        if (isCandleSequenceCorrect()) {
             candlePuzzleSolved = true;
             ui.showMessage("The candles burn steadily.\n\nSomething clicked in the distance.");
         } else {
-            ui.showMessage("The candle catches flame.");
+            turnOffAllCandles();
+            litCandleOrder.clear();
+            ui.showMessage("The wind grows stronger and turns off all the candles.\n\n"
+                    + "It must've been the wrong combination.\n\n"
+                    + "Let's try again.");
         }
     }
 
+    private void updateStageObjects() {
+        for (int i = 0; i < obj.length; i++) {
+            if (obj[i] instanceof NPC_JhonPorkJerkyJake) {
+                NPC_JhonPorkJerkyJake npc = (NPC_JhonPorkJerkyJake) obj[i];
+                npc.update();
+                if (npc.isFadedOut()) {
+                    obj[i] = null;
+                }
+            }
+        }
+    }
+
+    public boolean isCandlePuzzleSolved() {
+        return candlePuzzleSolved;
+    }
+
     private void resetCandlePuzzleState() {
-        candleSequenceIndex = 0;
+        litCandleOrder.clear();
         candlePuzzleSolved = false;
-        candleManualResetRequired = false;
         turnOffAllCandles();
     }
 
@@ -646,9 +860,25 @@ public class GamePanel extends JPanel implements Runnable{
         }
     }
 
-    private boolean areAllCandlesOff() {
+    private boolean areAllCandlesLit() {
+        int candleCount = 0;
         for (SuperObject object : obj) {
-            if (object instanceof objects.OBJ_Candle && ((objects.OBJ_Candle) object).isLit()) {
+            if (object instanceof objects.OBJ_Candle) {
+                candleCount++;
+                if (!((objects.OBJ_Candle) object).isLit()) {
+                    return false;
+                }
+            }
+        }
+        return candleCount > 0;
+    }
+
+    private boolean isCandleSequenceCorrect() {
+        if (litCandleOrder.size() != candleSequence.length) {
+            return false;
+        }
+        for (int i = 0; i < candleSequence.length; i++) {
+            if (litCandleOrder.get(i) != candleSequence[i]) {
                 return false;
             }
         }

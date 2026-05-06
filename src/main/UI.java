@@ -75,6 +75,7 @@ public class UI {
         }
 
         dialogueBox.draw(g2);
+        gp.devSettings.draw(g2);
 
     }
 
