@@ -8,9 +8,13 @@ import java.util.Random;
 public class MON_Dementor extends Entity {
 
     private int imageVariant;
-    private static final int DETECTION_RANGE = 5; // tiles
+    private static final int DETECTION_RANGE = 3; // tiles (reduced from 5)
     private static final float CHASE_SPEED = 1.5f;
     private static final float WANDER_SPEED = 1f;
+    
+    private int originalX = -1;
+    private int originalY = -1;
+    private static final int WANDER_RADIUS = 3; // tiles
 
     public MON_Dementor(GamePanel gp, int imageVariant) {
         super(gp);
@@ -93,6 +97,11 @@ public class MON_Dementor extends Entity {
     }
 
     public void setAction() {
+        if (originalX == -1 && originalY == -1) {
+            originalX = stageX;
+            originalY = stageY;
+        }
+
         // Check if player is nearby
         int playerX = gp.player.stageX;
         int playerY = gp.player.stageY;
@@ -124,28 +133,53 @@ public class MON_Dementor extends Entity {
                 }
             }
         } else {
-            // Player not detected - wander mode
+            // Player not detected
             speed = WANDER_SPEED;
 
-            actionLockCounter++;
-            if(actionLockCounter == 120) {
-                Random random = new Random();
-                int i = random.nextInt(100) + 1;
+            int distToOriginalX = Math.abs(stageX - originalX);
+            int distToOriginalY = Math.abs(stageY - originalY);
+            int tileDistToOriginal = (distToOriginalX + distToOriginalY) / gp.tileSize;
+            
+            // If the monster too far from original spawn, walk back
+            if (tileDistToOriginal > WANDER_RADIUS) {
+                int deltaX = originalX - stageX;
+                int deltaY = originalY - stageY;
+                
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    if (deltaX > 0) {
+                        direction = "right";
+                    } else {
+                        direction = "left";
+                    }
+                } else {
+                    if (deltaY > 0) {
+                        direction = "down";
+                    } else {
+                        direction = "up";
+                    }
+                }
+            } else {
+                // if within wander radius of our spawn point, freely wander
+                actionLockCounter++;
+                if(actionLockCounter == 120) {
+                    Random random = new Random();
+                    int i = random.nextInt(100) + 1;
 
-                if(i <= 25) {
-                    direction = "up";
-                }
-                if(i > 25 && i <= 50) {
-                    direction = "down";
-                }
-                if(i > 50 && i <= 75) {
-                    direction = "left";
-                }
-                if(i > 75 && i < 100) {
-                    direction = "right";
-                }
+                    if(i <= 25) {
+                        direction = "up";
+                    }
+                    if(i > 25 && i <= 50) {
+                        direction = "down";
+                    }
+                    if(i > 50 && i <= 75) {
+                        direction = "left";
+                    }
+                    if(i > 75 && i < 100) {
+                        direction = "right";
+                    }
 
-                actionLockCounter = 0;
+                    actionLockCounter = 0;
+                }
             }
         }
     }

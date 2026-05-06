@@ -183,7 +183,9 @@ public class CollisionChecker {
         }
 
         if(entity.solidArea.intersects(gp.player.solidArea)) {
-            entity.collisionOn = true;
+            if (!gp.player.invincible) {
+                entity.collisionOn = true;
+            }
             contactPlayer = true;
         }
 
@@ -299,7 +301,11 @@ public class CollisionChecker {
 
                 if(entity.solidArea.intersects(target[i].solidArea)) {
                     if(target[i] != entity) {
-                        entity.collisionOn = true;
+                        if (entity == gp.player && entity.invincible) {
+                            // Do nothing, pass through
+                        } else {
+                            entity.collisionOn = true;
+                        }
                         index = i;
                     }
                 }
@@ -315,4 +321,3 @@ public class CollisionChecker {
         return index;
     }
 }
-

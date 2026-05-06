@@ -70,11 +70,11 @@ public class Entity {
         collisionOn = false;
         gp.cChecker.checkTile(this);
         gp.cChecker.checkEntity(this, gp.monster);
-            gp.cChecker.checkPlayer(this);
         boolean contactPlayer = gp.cChecker.checkPlayer(this);
 
         if(this.type == 1 && contactPlayer == true) {
             if(gp.player.invincible == false) {
+                gp.playSE(7);
                 //we can give damage
                 gp.player.life -= 1;
                 gp.player.invincible = true;
