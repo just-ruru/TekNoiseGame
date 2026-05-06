@@ -22,7 +22,7 @@ public class MapConfig {
     }
     
     public static MapConfig getStage2Config(int tileSize) {
-        return new MapConfig(44, 60, tileSize);
+        return new MapConfig(44, 50, tileSize);
     }
     
     public static MapConfig getStage3Config(int tileSize) {

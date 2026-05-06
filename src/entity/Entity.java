@@ -130,14 +130,16 @@ public class Entity {
     }
 
     public void draw(Graphics2D g2) {
-        int screenX = stageX - gp.player.stageX + gp.player.screenX;
-        int screenY = stageY - gp.player.stageY + gp.player.screenY;
+        int cameraStageX = gp.getCameraStageX();
+        int cameraStageY = gp.getCameraStageY();
+        int screenX = stageX - cameraStageX + gp.player.screenX;
+        int screenY = stageY - cameraStageY + gp.player.screenY;
 
         // Only draw if within the on-screen area
-        if (stageX + gp.tileSize > gp.player.stageX - gp.player.screenX &&
-            stageX - gp.tileSize < gp.player.stageX + gp.player.screenX &&
-            stageY + gp.tileSize > gp.player.stageY - gp.player.screenY &&
-            stageY - gp.tileSize < gp.player.stageY + gp.player.screenY) {
+        if (stageX + gp.tileSize > cameraStageX - gp.player.screenX &&
+            stageX - gp.tileSize < cameraStageX + gp.player.screenX &&
+            stageY + gp.tileSize > cameraStageY - gp.player.screenY &&
+            stageY - gp.tileSize < cameraStageY + gp.player.screenY) {
 
             BufferedImage image = null;
             boolean useFirstFrame = (spriteNum == 1 || spriteNum == 3);

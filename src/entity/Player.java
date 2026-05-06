@@ -5,23 +5,38 @@ import main.KeyHandler;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.BufferedInputStream;
 import java.io.IOException;
 
 import main.Sound;
-import main.VignetteLight;
 
 public class Player extends Entity{
+    private static final float WALK_SPEED = 4f;
+    private static final float SPRINT_SPEED = 4f;
+    private static final float EXHAUSTED_SPEED = 1f;
+    private static final int MAX_STAMINA_TICKS = 200;
+    private static final int EXHAUSTED_TICKS = 180;
+    private static final int SPRINT_COOLDOWN_TICKS = 300;
+    private static final int STAMINA_REGEN_TICKS_PER_POINT = 2;
+    private static final int AXE_TABLE_COOLDOWN_TICKS = 120;
+    private static final int AXE_DOOR_COOLDOWN_TICKS = 600;
+
     GamePanel gp;
     KeyHandler keyH;
     Sound walkingSound;
     private int choice;
     private int interactCooldown = 0;
+    private int staminaTicks = MAX_STAMINA_TICKS;
+    private int exhaustedTicksRemaining = 0;
+    private int sprintCooldownTicksRemaining = 0;
+    private int staminaRegenCounter = 0;
 
     public final int screenX;
     public final int screenY;
     public int hasKey = 0;
     public boolean hasReplacementSwitch = false;
+    public boolean hasAxe = false;
+    private int axeTableCooldownTicks = 0;
+    private int axeDoorCooldownTicks = 0;
 
 
     public Player(GamePanel gp, KeyHandler keyH, int choice){
@@ -50,8 +65,15 @@ public class Player extends Entity{
     }
 
     public void setDefaultValues(){
-        speed = 4f;
+        speed = WALK_SPEED;
         direction = "down";
+        staminaTicks = MAX_STAMINA_TICKS;
+        exhaustedTicksRemaining = 0;
+        sprintCooldownTicksRemaining = 0;
+        staminaRegenCounter = 0;
+        hasAxe = false;
+        axeTableCooldownTicks = 0;
+        axeDoorCooldownTicks = 0;
 
         //PLAYER STATUS
         maxLife = 5;
@@ -201,8 +223,15 @@ public class Player extends Entity{
         if (interactCooldown > 0) {
             interactCooldown--;
         }
+        if (axeTableCooldownTicks > 0) {
+            axeTableCooldownTicks--;
+        }
+        if (axeDoorCooldownTicks > 0) {
+            axeDoorCooldownTicks--;
+        }
 
         boolean moving = keyH.isUpPressed || keyH.isDownPressed || keyH.isLeftPressed || keyH.isRightPressed;
+        updateSprintState(moving);
 
         if(moving){
 
@@ -307,7 +336,11 @@ public class Player extends Entity{
                             gp.ui.showMessage(getBrokenSwitchDialogue());
                         } else if (gp.vignette.turnLightsOn()) {
                             hasReplacementSwitch = false;
-                            gp.ui.showMessage(getSwitchFixedDialogue());
+                            if (isStage("/maps/stage01.txt")) {
+                                gp.startStage1DoorRevealCutscene();
+                            } else {
+                                gp.ui.showMessage(getSwitchFixedDialogue());
+                            }
                         } else {
                             gp.ui.showMessage(getSwitchAlreadyOnDialogue());
                         }
@@ -364,13 +397,23 @@ public class Player extends Entity{
 
                 case "DoorStage2":
                     if (keyH.interactPressed && interactCooldown == 0) {
-                        if(hasKey > 0) {
+                        objects.OBJ_DoorStage2 door = (objects.OBJ_DoorStage2) gp.obj[i];
+                        if (door.isOpenable()) {
                             gp.playSE(3);
-                            hasKey--;
                             gp.ui.showMessage(getDoorOpenedDialogue());
                             gp.startMapTransition("/maps/stage03.txt");
+                        } else if (!hasAxe) {
+                            gp.ui.showMessage("The door is barred shut.\n\nI need something strong enough to break the planks.");
+                        } else if (axeDoorCooldownTicks > 0) {
+                            gp.ui.showMessage("I need to catch my breath before swinging the axe again.");
                         } else {
-                            gp.ui.showMessage(getLockedDoorDialogue());
+                            door.hitWithAxe();
+                            axeDoorCooldownTicks = AXE_DOOR_COOLDOWN_TICKS;
+                            if (door.isOpenable()) {
+                                gp.ui.showMessage("The last plank breaks loose.\n\nThe door can open now.");
+                            } else {
+                                gp.ui.showMessage("You strike the planks with the axe.\n\nMore of the door is exposed.");
+                            }
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -406,6 +449,51 @@ public class Player extends Entity{
                         hasReplacementSwitch = true;
                         gp.obj[i] = null;
                         gp.ui.showMessage(getBagDialogue());
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "Axe":
+                    gp.playSE(3);
+                    hasAxe = true;
+                    gp.obj[i] = null;
+                    gp.ui.showMessage("You picked up an axe.\n\nThis can break damaged tables and wooden planks.");
+                    break;
+
+                case "BreakableTable":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        if (!hasAxe) {
+                            gp.ui.showMessage("This table is cracked, but I cannot break it by hand.");
+                        } else if (axeTableCooldownTicks > 0) {
+                            gp.ui.showMessage("I need a moment before swinging the axe again.");
+                        } else {
+                            gp.playSE(3);
+                            gp.obj[i] = null;
+                            axeTableCooldownTicks = AXE_TABLE_COOLDOWN_TICKS;
+                            gp.ui.showMessage("You break the table apart with the axe.");
+                        }
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "HealthBag":
+                    if (life < maxLife) {
+                        gp.playSE(3);
+                        life = maxLife;
+                        gp.obj[i] = null;
+                        gp.ui.showMessage("You used the health bag.\n\nHealth restored.");
+                    } else if (keyH.interactPressed && interactCooldown == 0) {
+                        gp.ui.showMessage("There is medicine inside.\n\nI should save it until I need it.");
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "Candle":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        gp.handleCandleInteraction((objects.OBJ_Candle) gp.obj[i]);
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -530,9 +618,7 @@ public class Player extends Entity{
         }
 
         if (isStage("/maps/stage02.txt")) {
-            return "The paper is covered in smudged diagrams.\n\n"
-                    + "Rooms, doors, switches...\n\n"
-                    + "Someone was trying to understand the pattern.";
+            return "insert text here kyle";
         }
         if (isStage("/maps/stage03.txt")) {
             return "The page is almost unreadable.\n\n"
@@ -566,9 +652,102 @@ public class Player extends Entity{
         walkingSound.setVolume(volume);
     }
 
+    private void updateSprintState(boolean moving) {
+        if (exhaustedTicksRemaining > 0) {
+            exhaustedTicksRemaining--;
+            speed = EXHAUSTED_SPEED;
+            return;
+        }
+
+        if (sprintCooldownTicksRemaining > 0) {
+            sprintCooldownTicksRemaining--;
+            speed = WALK_SPEED;
+            if (sprintCooldownTicksRemaining == 0) {
+                staminaTicks = MAX_STAMINA_TICKS;
+                staminaRegenCounter = 0;
+            }
+            return;
+        }
+
+        boolean canSprint = moving && keyH.sprintPressed && staminaTicks > 0;
+        if (canSprint) {
+            speed = SPRINT_SPEED;
+            staminaTicks--;
+            staminaRegenCounter = 0;
+
+            if (staminaTicks <= 0) {
+                staminaTicks = 0;
+                exhaustedTicksRemaining = EXHAUSTED_TICKS;
+                sprintCooldownTicksRemaining = SPRINT_COOLDOWN_TICKS;
+                speed = EXHAUSTED_SPEED;
+            }
+            return;
+        }
+
+        speed = WALK_SPEED;
+        if (staminaTicks < MAX_STAMINA_TICKS) {
+            staminaRegenCounter++;
+            if (staminaRegenCounter >= STAMINA_REGEN_TICKS_PER_POINT) {
+                staminaTicks++;
+                staminaRegenCounter = 0;
+            }
+        } else {
+            staminaRegenCounter = 0;
+        }
+    }
+
+    public float getStaminaPercent() {
+        return (float) staminaTicks / MAX_STAMINA_TICKS;
+    }
+
+    public boolean isExhausted() {
+        return exhaustedTicksRemaining > 0;
+    }
+
+    public boolean isSprintOnCooldown() {
+        return sprintCooldownTicksRemaining > 0;
+    }
+
+    public int getCooldownSecondsRemaining() {
+        return (int) Math.ceil(sprintCooldownTicksRemaining / 60.0);
+    }
+
+    public boolean hasAxeCooldownActive() {
+        return axeTableCooldownTicks > 0 || axeDoorCooldownTicks > 0;
+    }
+
+    public int getAxeTableCooldownSecondsRemaining() {
+        return (int) Math.ceil(axeTableCooldownTicks / 60.0);
+    }
+
+    public int getAxeDoorCooldownSecondsRemaining() {
+        return (int) Math.ceil(axeDoorCooldownTicks / 60.0);
+    }
+
+    public int getActiveAxeCooldownSecondsRemaining() {
+        return Math.max(getAxeDoorCooldownSecondsRemaining(), getAxeTableCooldownSecondsRemaining());
+    }
+
+    public float getAxeCooldownReadyPercent() {
+        if (axeDoorCooldownTicks > 0) {
+            return 1f - ((float) axeDoorCooldownTicks / AXE_DOOR_COOLDOWN_TICKS);
+        }
+        if (axeTableCooldownTicks > 0) {
+            return 1f - ((float) axeTableCooldownTicks / AXE_TABLE_COOLDOWN_TICKS);
+        }
+        return 1f;
+    }
+
+    public boolean isAxeDoorCooldownActive() {
+        return axeDoorCooldownTicks > 0;
+    }
+
     public void draw(Graphics2D g2) {
 //        g2.setColor(Color.RED);
 //        g2.fillOval(x, y, gp.tileSize, gp.tileSize);
+
+        int drawX = stageX - gp.getCameraStageX() + screenX;
+        int drawY = stageY - gp.getCameraStageY() + screenY;
 
         BufferedImage image = null;
 
@@ -644,19 +823,19 @@ public class Player extends Entity{
 
         switch(choice) {
             case 1:
-                g2.drawImage(image, screenX, screenY, 25 * 2, 40 * 2, null);
+                g2.drawImage(image, drawX, drawY, 25 * 2, 40 * 2, null);
             break;
 
             case 2:
-                g2.drawImage(image, screenX, screenY, 29*2, 32*2, null);
+                g2.drawImage(image, drawX, drawY, 29*2, 32*2, null);
             break;
 
             case 3:
-                g2.drawImage(image, screenX, screenY, 25*2, 41*2, null);
+                g2.drawImage(image, drawX, drawY, 25*2, 41*2, null);
             break;
 
             case 4:
-                g2.drawImage(image, screenX, screenY, 31*2, 37*2, null);
+                g2.drawImage(image, drawX, drawY, 31*2, 37*2, null);
             break;
             default:
                 break;

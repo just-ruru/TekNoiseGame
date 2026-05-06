@@ -164,7 +164,13 @@ public class TileManager {
     }
 
     private int parseMapToken(String token, int col, int row) {
-        if ("X".equalsIgnoreCase(token)) {
+        if ("A".equalsIgnoreCase(token) ||
+                "C".equalsIgnoreCase(token) ||
+                "D".equalsIgnoreCase(token) ||
+                "H".equalsIgnoreCase(token) ||
+                "J".equalsIgnoreCase(token) ||
+                "N".equalsIgnoreCase(token) ||
+                "X".equalsIgnoreCase(token)) {
             return 0;
         }
 
@@ -185,6 +191,8 @@ public class TileManager {
     }
 
     public void draw(Graphics2D g2) {
+        int cameraStageX = gp.getCameraStageX();
+        int cameraStageY = gp.getCameraStageY();
 
         int stageCol = 0;
         int stageRow = 0;
@@ -195,13 +203,13 @@ public class TileManager {
 
             int stageX = stageCol * gp.tileSize;
             int stageY = stageRow * gp.tileSize;
-            int screenX =  stageX - gp.player.stageX + gp.player.screenX;
-            int screenY = stageY - gp.player.stageY + gp.player.screenY;
+            int screenX =  stageX - cameraStageX + gp.player.screenX;
+            int screenY = stageY - cameraStageY + gp.player.screenY;
 
-            if(stageX + gp.tileSize > gp.player.stageX - gp.player.screenX &&
-                    stageX - gp.tileSize < gp.player.stageX + gp.player.screenX &&
-                    stageY + gp.tileSize > gp.player.stageY - gp.player.screenY &&
-                    stageY - gp.tileSize < gp.player.stageY + gp.player.screenY) {
+            if(stageX + gp.tileSize > cameraStageX - gp.player.screenX &&
+                    stageX - gp.tileSize < cameraStageX + gp.player.screenX &&
+                    stageY + gp.tileSize > cameraStageY - gp.player.screenY &&
+                    stageY - gp.tileSize < cameraStageY + gp.player.screenY) {
 
 
                 if (tile[tileNum] == null) {

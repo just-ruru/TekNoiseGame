@@ -71,7 +71,7 @@ public class GamePanel extends JPanel implements Runnable{
 
     // ENTITY AND OBJECT
     public Player player = new Player(this,keyH, choice);
-    public SuperObject obj[]= new SuperObject[30];
+    public SuperObject obj[]= new SuperObject[120];
     public Entity monster[] = new Entity[20];
 
     // GAME STATE
@@ -80,6 +80,7 @@ public class GamePanel extends JPanel implements Runnable{
     public final int playState = 1;
     public final  int pauseState = 2;
     public final int transitionState = 3;
+    public final int cutsceneState = 4;
 
     // MAP / TRANSITION
     private String currentMapPath = "/maps/stage01.txt";
@@ -95,6 +96,25 @@ public class GamePanel extends JPanel implements Runnable{
     private final float startingMasterVolume = 0.7f;
     private float masterVolume = startingMasterVolume;
     private final float volumeStep = 0.1f;
+    private float cameraStageX;
+    private float cameraStageY;
+    private static final float CAMERA_PAN_SPEED = 5f;
+    private static final int CUTSCENE_HOLD_TICKS = 45;
+    private static final int CUTSCENE_NONE = 0;
+    private static final int CUTSCENE_STAGE1_LIGHTS_TO_DOOR = 1;
+    private static final int CUTSCENE_PHASE_PAN_TO_TARGET = 0;
+    private static final int CUTSCENE_PHASE_WAIT_FOR_DIALOGUE = 1;
+    private static final int CUTSCENE_PHASE_RETURN_TO_PLAYER = 2;
+    private int activeCutscene = CUTSCENE_NONE;
+    private int cutscenePhase = CUTSCENE_PHASE_PAN_TO_TARGET;
+    private int cutsceneHoldTicks = 0;
+    private float cutsceneTargetStageX;
+    private float cutsceneTargetStageY;
+    private boolean stage01DoorRevealPlayed = false;
+    private final int[] candleSequence = {1, 4, 2, 3};
+    private int candleSequenceIndex = 0;
+    private boolean candlePuzzleSolved = false;
+    private boolean candleManualResetRequired = false;
 
     int playerX = player.stageX;
     int playerY = player.stageY;
@@ -240,10 +260,14 @@ public class GamePanel extends JPanel implements Runnable{
     public void setupGame() {
         // Stage start: keys are per-stage and shouldn't carry over.
         resetStageThoughtState();
+        stage01DoorRevealPlayed = false;
+        activeCutscene = CUTSCENE_NONE;
+        resetCandlePuzzleState();
         player.hasKey = 0;
         player.hasReplacementSwitch = false;
         player.setDefaultValues();
         player.setSpawnForMap(currentMapPath);
+        snapCameraToPlayer();
         assetSetter.setObject(currentMapPath);
 //        assetSetter.setObject();
         assetSetter.setMonster(currentMapPath);
@@ -263,6 +287,7 @@ public class GamePanel extends JPanel implements Runnable{
         }
         if(gameState == playState) {
             player.update();
+            updateCameraFollowPlayer();
 
             if (!ui.isDialogueActive()) {
                 for(int i = 0; i < monster.length; i++) {
@@ -280,13 +305,79 @@ public class GamePanel extends JPanel implements Runnable{
         if(gameState == pauseState) {
             //nothing
         }
+        if (gameState == cutsceneState) {
+            updateCutscene();
+        }
         if (gameState == transitionState) {
             updateTransition();
         }
         ui.update();
-        if (gameState != playState) {
+        if (gameState == cutsceneState && ui.isDialogueActive() && keyH.interactPressed) {
+            ui.advanceDialogue();
+            keyH.interactPressed = false;
+        }
+        if (gameState != playState && gameState != cutsceneState) {
             checkEnemyProximityDimming();
             vignette.update();
+        }
+    }
+
+    private void updateCameraFollowPlayer() {
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+    }
+
+    private void snapCameraToPlayer() {
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+    }
+
+    private boolean moveCameraToward(float targetX, float targetY, float speed) {
+        float dx = targetX - cameraStageX;
+        float dy = targetY - cameraStageY;
+        double distance = Math.sqrt((dx * dx) + (dy * dy));
+        if (distance <= speed) {
+            cameraStageX = targetX;
+            cameraStageY = targetY;
+            return true;
+        }
+
+        cameraStageX += (float) ((dx / distance) * speed);
+        cameraStageY += (float) ((dy / distance) * speed);
+        return false;
+    }
+
+    private void updateCutscene() {
+        if (activeCutscene == CUTSCENE_STAGE1_LIGHTS_TO_DOOR) {
+            updateStage1DoorRevealCutscene();
+        }
+    }
+
+    private void updateStage1DoorRevealCutscene() {
+        if (cutscenePhase == CUTSCENE_PHASE_PAN_TO_TARGET) {
+            if (moveCameraToward(cutsceneTargetStageX, cutsceneTargetStageY, CAMERA_PAN_SPEED)) {
+                if (cutsceneHoldTicks > 0) {
+                    cutsceneHoldTicks--;
+                } else {
+                    ui.showMessage("ah so there's the door");
+                    cutscenePhase = CUTSCENE_PHASE_WAIT_FOR_DIALOGUE;
+                }
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_PHASE_WAIT_FOR_DIALOGUE) {
+            if (!ui.isDialogueActive()) {
+                cutscenePhase = CUTSCENE_PHASE_RETURN_TO_PLAYER;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_PHASE_RETURN_TO_PLAYER) {
+            if (moveCameraToward(player.stageX, player.stageY, CAMERA_PAN_SPEED)) {
+                activeCutscene = CUTSCENE_NONE;
+                gameState = playState;
+            }
         }
     }
 
@@ -421,10 +512,14 @@ public class GamePanel extends JPanel implements Runnable{
 
                 // Reset "once per stage" thought state after the map changes.
                 resetStageThoughtState();
+                int currentLife = player.life;
                 player.setDefaultValues();
+                player.life = Math.min(currentLife, player.maxLife);
                 player.setSpawnForMap(currentMapPath);
+                snapCameraToPlayer();
                 player.hasKey = 0; // keys are per-stage
                 player.hasReplacementSwitch = false; // repair parts are per-stage
+                resetCandlePuzzleState();
                 assetSetter.setObject(currentMapPath);
                 assetSetter.setMonster(currentMapPath);
 
@@ -452,6 +547,112 @@ public class GamePanel extends JPanel implements Runnable{
 
     public String getCurrentMapPath() {
         return currentMapPath;
+    }
+
+    public int getCameraStageX() {
+        return Math.round(cameraStageX);
+    }
+
+    public int getCameraStageY() {
+        return Math.round(cameraStageY);
+    }
+
+    public void startStage1DoorRevealCutscene() {
+        if (stage01DoorRevealPlayed || !"/maps/stage01.txt".equals(currentMapPath)) {
+            return;
+        }
+
+        SuperObject door = findObjectByName("DoorStage1");
+        if (door == null) {
+            return;
+        }
+
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+        cutsceneTargetStageX = door.stageX;
+        cutsceneTargetStageY = door.stageY + (tileSize / 2f);
+        cutsceneHoldTicks = CUTSCENE_HOLD_TICKS;
+        activeCutscene = CUTSCENE_STAGE1_LIGHTS_TO_DOOR;
+        cutscenePhase = CUTSCENE_PHASE_PAN_TO_TARGET;
+        stage01DoorRevealPlayed = true;
+        gameState = cutsceneState;
+    }
+
+    private SuperObject findObjectByName(String objectName) {
+        for (SuperObject object : obj) {
+            if (object != null && objectName.equals(object.name)) {
+                return object;
+            }
+        }
+        return null;
+    }
+
+    public void handleCandleInteraction(objects.OBJ_Candle candle) {
+        if (candlePuzzleSolved) {
+            ui.showMessage("The candles are already burning in the right order.");
+            return;
+        }
+
+        if (candle.isLit()) {
+            candle.turnOff();
+            if (areAllCandlesOff()) {
+                candleSequenceIndex = 0;
+                candleManualResetRequired = false;
+                ui.showMessage("All candles are out.\n\nThe sequence can be started again.");
+            } else {
+                candleManualResetRequired = true;
+                ui.showMessage("The candle goes out.\n\nTurn all candles off to restart the sequence.");
+            }
+            return;
+        }
+
+        if (candleManualResetRequired) {
+            ui.showMessage("Turn all candles off first.\n\nThen start the sequence again.");
+            return;
+        }
+
+        int expectedCandle = candleSequence[candleSequenceIndex];
+        if (candle.getCandleNumber() != expectedCandle) {
+            turnOffAllCandles();
+            candleSequenceIndex = 0;
+            candleManualResetRequired = false;
+            ui.showMessage("The flames shudder and die.\n\nThat was the wrong order.");
+            return;
+        }
+
+        candle.setLit(true);
+        candleSequenceIndex++;
+
+        if (candleSequenceIndex >= candleSequence.length) {
+            candlePuzzleSolved = true;
+            ui.showMessage("The candles burn steadily.\n\nSomething clicked in the distance.");
+        } else {
+            ui.showMessage("The candle catches flame.");
+        }
+    }
+
+    private void resetCandlePuzzleState() {
+        candleSequenceIndex = 0;
+        candlePuzzleSolved = false;
+        candleManualResetRequired = false;
+        turnOffAllCandles();
+    }
+
+    private void turnOffAllCandles() {
+        for (SuperObject object : obj) {
+            if (object instanceof objects.OBJ_Candle) {
+                ((objects.OBJ_Candle) object).turnOff();
+            }
+        }
+    }
+
+    private boolean areAllCandlesOff() {
+        for (SuperObject object : obj) {
+            if (object instanceof objects.OBJ_Candle && ((objects.OBJ_Candle) object).isLit()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void run(){

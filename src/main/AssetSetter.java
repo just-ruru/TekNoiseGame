@@ -6,6 +6,15 @@ import objects.OBJ_LightSwitch;
 import objects.OBJ_TablePaper;
 import objects.*;
 
+import java.awt.Point;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
 public class AssetSetter {
     GamePanel gp;
 
@@ -90,34 +99,69 @@ public class AssetSetter {
     }
 
     private void setStage02Objects() {
-        gp.obj[0] = new OBJ_TablePaper();
-        gp.obj[0].stageX = 10 * gp.tileSize;
-        gp.obj[0].stageY = 5 * gp.tileSize;
+        int objectIndex = 0;
+        boolean doorPlaced = false;
+        List<Point> breakableTableTiles = new ArrayList<>();
+        List<Point> candleTiles = new ArrayList<>();
 
-        gp.obj[1] = new OBJ_LightSwitch();
-        gp.obj[1].stageX = 2 * gp.tileSize;
-        gp.obj[1].stageY = 1 * gp.tileSize;
+        try {
+            InputStream is = getClass().getResourceAsStream("/maps/stage02.txt");
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
-        gp.obj[2] = new OBJ_Bag();
-        gp.obj[2].stageX = 24 * gp.tileSize;
-        gp.obj[2].stageY = 10 * gp.tileSize;
+            String line;
+            int row = 0;
+            while ((line = br.readLine()) != null) {
+                String[] tokens = line.trim().split("\\s+");
+                for (int col = 0; col < tokens.length; col++) {
+                    String token = tokens[col];
 
-        gp.obj[3] = new OBJ_Key_Table();
-        gp.obj[3].stageX = 36 * gp.tileSize;
-        gp.obj[3].stageY = 8 * gp.tileSize;
+                    if ("D".equalsIgnoreCase(token) && !doorPlaced) {
+                        objectIndex = addObject(objectIndex, new OBJ_DoorStage2(), col, row);
+                        doorPlaced = true;
+                    } else if ("X".equalsIgnoreCase(token)) {
+                        breakableTableTiles.add(new Point(col, row));
+                    } else if ("C".equalsIgnoreCase(token)) {
+                        objectIndex = addObject(objectIndex, new OBJ_TablePaper(), col, row);
+                    } else if ("H".equalsIgnoreCase(token)) {
+                        objectIndex = addObject(objectIndex, new OBJ_HealthBag(), col, row);
+                    } else if ("A".equalsIgnoreCase(token)) {
+                        objectIndex = addObject(objectIndex, new OBJ_Axe(), col, row);
+                    } else if ("N".equalsIgnoreCase(token)) {
+                        candleTiles.add(new Point(col, row));
+                    }
+                }
+                row++;
+            }
 
-        // Stage 2 can have its own exit door location.
-        gp.obj[4] = new OBJ_DoorStage2();
-        gp.obj[4].stageX = 41 * gp.tileSize;
-        gp.obj[4].stageY = 8 * gp.tileSize;
+            br.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-        gp.obj[5] = new OBJ_Empty_Table();
-        gp.obj[5].stageX = 12 * gp.tileSize;
-        gp.obj[5].stageY = 12 * gp.tileSize;
+        candleTiles.sort(Comparator.comparingInt((Point point) -> point.y).thenComparingInt(point -> point.x));
+        for (int i = 0; i < candleTiles.size(); i++) {
+            Point tile = candleTiles.get(i);
+            objectIndex = addObject(objectIndex, new OBJ_Candle(i + 1), tile.x, tile.y);
+        }
 
-        gp.obj[6] = new OBJ_Empty_Table();
-        gp.obj[6].stageX = 29 * gp.tileSize;
-        gp.obj[6].stageY = 4 * gp.tileSize;
+        Collections.shuffle(breakableTableTiles);
+        for (int i = 0; i < breakableTableTiles.size(); i++) {
+            Point tile = breakableTableTiles.get(i);
+            int tableVariant = (i % 4) + 1;
+            objectIndex = addObject(objectIndex, new OBJ_BreakableTable(tableVariant), tile.x, tile.y);
+        }
+    }
+
+    private int addObject(int objectIndex, SuperObject object, int tileCol, int tileRow) {
+        if (objectIndex >= gp.obj.length) {
+            System.out.println("Warning: object array is full, skipped " + object.name + " at " + tileCol + "," + tileRow);
+            return objectIndex;
+        }
+
+        gp.obj[objectIndex] = object;
+        gp.obj[objectIndex].stageX = tileCol * gp.tileSize;
+        gp.obj[objectIndex].stageY = tileRow * gp.tileSize;
+        return objectIndex + 1;
     }
     
     private void setStage03Objects() {

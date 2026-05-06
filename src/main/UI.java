@@ -66,6 +66,8 @@ public class UI {
         if(gp.gameState == gp.playState) {
             drawPlayerLife();
             drawKeyInventory();
+            drawStaminaBar();
+            drawAxeCooldown();
         }
 
         if(gp.gameState == gp.pauseState) {
@@ -152,7 +154,7 @@ public class UI {
 
     public void drawPlayerLife() {
         int x = gp.tileSize / 2;
-        int y = gp.screenHeight - gp.tileSize - gp.tileSize / 2;
+        int y = gp.screenHeight - (gp.tileSize * 2);
 
         int life = gp.player.life;
         int maxLife = gp.player.maxLife;
@@ -170,6 +172,86 @@ public class UI {
             default:
                 g2.drawImage(health_0, x, y, null); break;
         }
+    }
+
+    public void drawStaminaBar() {
+        int barX = gp.tileSize / 2;
+        int barY = gp.screenHeight - (gp.tileSize * 2) - gp.tileSize / 2;
+        int barWidth = gp.tileSize * 3;
+        int barHeight = 12;
+
+        g2.setColor(new Color(20, 20, 20, 190));
+        g2.fillRoundRect(barX, barY, barWidth, barHeight, 8, 8);
+
+        float staminaPercent = gp.player.getStaminaPercent();
+        int fillWidth = Math.round((barWidth - 4) * staminaPercent);
+        if (gp.player.isExhausted()) {
+            g2.setColor(new Color(200, 70, 70));
+        } else if (gp.player.isSprintOnCooldown()) {
+            g2.setColor(new Color(230, 180, 70));
+        } else if (staminaPercent <= 0.20f) {
+            g2.setColor(new Color(210, 70, 70));
+        } else if (staminaPercent <= 0.50f) {
+            g2.setColor(new Color(235, 200, 70));
+        } else {
+            g2.setColor(new Color(90, 210, 120));
+        }
+        g2.fillRoundRect(barX + 2, barY + 2, fillWidth, barHeight - 4, 6, 6);
+
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(barX, barY, barWidth, barHeight, 8, 8);
+
+        g2.setFont(g2.getFont().deriveFont(Font.BOLD, 14F));
+        if (gp.player.isExhausted()) {
+            g2.drawString("EXHAUSTED", barX + barWidth + 10, barY + 11);
+        } else if (gp.player.isSprintOnCooldown()) {
+            g2.drawString("Recovering... " + gp.player.getCooldownSecondsRemaining() + "s", barX + barWidth + 10, barY + 11);
+        }
+        g2.setFont(arial_40);
+    }
+
+    public void drawAxeCooldown() {
+        if (!gp.player.hasAxe) {
+            return;
+        }
+
+        int x = gp.tileSize / 2;
+        int y = gp.screenHeight - (gp.tileSize * 3);
+        int width = gp.tileSize * 3;
+        int height = 18;
+        boolean coolingDown = gp.player.hasAxeCooldownActive();
+
+        String text = "AXE READY";
+        Color fillColor = new Color(65, 160, 95);
+        if (coolingDown) {
+            String cooldownName = gp.player.isAxeDoorCooldownActive() ? "DOOR" : "TABLE";
+            text = "RESTING" + " " + gp.player.getActiveAxeCooldownSecondsRemaining() + "s";
+            fillColor = gp.player.isAxeDoorCooldownActive()
+                    ? new Color(185, 95, 65)
+                    : new Color(210, 160, 65);
+        }
+
+        g2.setColor(new Color(20, 20, 20, 190));
+        g2.fillRoundRect(x, y, width, height, 8, 8);
+
+        int fillWidth = width - 4;
+        if (coolingDown) {
+            fillWidth = Math.round((width - 4) * gp.player.getAxeCooldownReadyPercent());
+        }
+
+        g2.setColor(fillColor);
+        g2.fillRoundRect(x + 2, y + 2, fillWidth, height - 4, 6, 6);
+
+        g2.setColor(Color.WHITE);
+        g2.drawRoundRect(x, y, width, height, 8, 8);
+
+        Font oldFont = g2.getFont();
+        g2.setFont(oldFont.deriveFont(Font.BOLD, 13F));
+        FontMetrics fm = g2.getFontMetrics();
+        int textX = x + (width - fm.stringWidth(text)) / 2;
+        int textY = y + ((height - fm.getHeight()) / 2) + fm.getAscent();
+        g2.drawString(text, textX, textY);
+        g2.setFont(oldFont);
     }
 
 }

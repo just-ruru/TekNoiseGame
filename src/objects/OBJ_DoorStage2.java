@@ -4,40 +4,98 @@ import main.GamePanel;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
-import java.io.IOException;
+import java.awt.image.BufferedImage;
+import java.io.InputStream;
 
-public class OBJ_DoorStage2 extends objects.SuperObject {
-    public OBJ_DoorStage2(){
+public class OBJ_DoorStage2 extends SuperObject {
+    private int phase = 1;
+    private final BufferedImage[] phaseImages = new BufferedImage[4];
+
+    public OBJ_DoorStage2() {
         name = "DoorStage2";
         collision = true;
-
-        // Default door hitbox: only the lower half blocks the player (bottom tile).
-        // (Tile size in this project is 48, see GamePanel.tileSize.)
-        solidArea = new Rectangle(0, 48, 48, 48);
+        solidArea = new Rectangle(0, 0, 144, 96);
         solidAreaDefaultX = solidArea.x;
         solidAreaDefaultY = solidArea.y;
-        try{
-            image = ImageIO.read(getClass().getResourceAsStream("/objects/doorfull.png"));
-        }catch(IOException e){
-            e.printStackTrace();
+
+        image = loadImage("/objects/doorfull.png");
+        for (int i = 0; i < phaseImages.length; i++) {
+            phaseImages[i] = loadImage("/objects/stage2Door/Stage2Door" + (i + 1) + ".png");
+        }
+    }
+
+    public int getPhase() {
+        return phase;
+    }
+
+    public boolean isOpenable() {
+        return phase >= 4;
+    }
+
+    public void hitWithAxe() {
+        if (phase < 4) {
+            phase++;
         }
     }
 
     @Override
-    public void draw(Graphics2D g2, GamePanel gp){
-        int screenX =  stageX - gp.player.stageX + gp.player.screenX;
-        int screenY = stageY - gp.player.stageY + gp.player.screenY;
+    public void draw(Graphics2D g2, GamePanel gp) {
+        int cameraStageX = gp.getCameraStageX();
+        int cameraStageY = gp.getCameraStageY();
+        int screenX = stageX - cameraStageX + gp.player.screenX;
+        int screenY = stageY - cameraStageY + gp.player.screenY;
 
-        // Door sprite is meant to be 2 tiles tall.
-        int drawW = gp.tileSize;
+        int drawW = gp.tileSize * 3;
         int drawH = gp.tileSize * 2;
 
-        if(stageX + drawW > gp.player.stageX - gp.player.screenX &&
-                stageX - drawW < gp.player.stageX + gp.player.screenX &&
-                stageY + drawH > gp.player.stageY - gp.player.screenY &&
-                stageY - drawH < gp.player.stageY + gp.player.screenY) {
+        if (stageX + drawW > cameraStageX - gp.player.screenX &&
+                stageX - drawW < cameraStageX + gp.player.screenX &&
+                stageY + drawH > cameraStageY - gp.player.screenY &&
+                stageY - drawH < cameraStageY + gp.player.screenY) {
 
-            g2.drawImage(image, screenX, screenY, drawW, drawH, null);
+            BufferedImage phaseImage = phaseImages[Math.max(0, Math.min(phaseImages.length - 1, phase - 1))];
+            if (phaseImage != null) {
+                g2.drawImage(phaseImage, screenX, screenY, drawW, drawH, null);
+            } else {
+                for (int col = 0; col < 3; col++) {
+                    g2.drawImage(image, screenX + (col * gp.tileSize), screenY, gp.tileSize, drawH, null);
+                }
+                drawPlanks(g2, screenX, screenY, drawW, drawH);
+            }
+        }
+    }
+
+    private void drawPlanks(Graphics2D g2, int x, int y, int width, int height) {
+        Color oldColor = g2.getColor();
+        Stroke oldStroke = g2.getStroke();
+
+        g2.setStroke(new BasicStroke(8, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g2.setColor(new Color(92, 55, 28));
+
+        if (phase <= 1) {
+            g2.drawLine(x + 12, y + 18, x + width - 12, y + height - 18);
+        }
+        if (phase <= 2) {
+            g2.drawLine(x + 12, y + height - 18, x + width - 12, y + 18);
+        }
+        if (phase <= 3) {
+            g2.drawLine(x + 18, y + height / 2, x + width - 18, y + height / 2);
+        }
+
+        g2.setStroke(oldStroke);
+        g2.setColor(oldColor);
+    }
+
+    private BufferedImage loadImage(String path) {
+        try {
+            InputStream stream = getClass().getResourceAsStream(path);
+            if (stream == null) {
+                return null;
+            }
+            return ImageIO.read(stream);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
     }
 }

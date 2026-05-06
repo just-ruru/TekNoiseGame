@@ -5,7 +5,7 @@ import java.awt.event.KeyListener;
 
 public class KeyHandler implements KeyListener {
     GamePanel gp;
-    public boolean isUpPressed, isDownPressed, isRightPressed, isLeftPressed, interactPressed;
+    public boolean isUpPressed, isDownPressed, isRightPressed, isLeftPressed, interactPressed, sprintPressed;
 
     public KeyHandler(GamePanel gp) {
         this.gp = gp;
@@ -76,6 +76,16 @@ public class KeyHandler implements KeyListener {
                 interactPressed = true;
             }
 
+            if(code == KeyEvent.VK_SHIFT){
+                sprintPressed = true;
+            }
+
+        }
+
+        if (gp.gameState == gp.cutsceneState) {
+            if(code == KeyEvent.VK_E){
+                interactPressed = true;
+            }
         }
 
         if(code == KeyEvent.VK_P){
@@ -123,6 +133,10 @@ public class KeyHandler implements KeyListener {
 
         if(code == KeyEvent.VK_E){
             interactPressed = false;
+        }
+
+        if(code == KeyEvent.VK_SHIFT){
+            sprintPressed = false;
         }
     }
 }
