@@ -63,6 +63,7 @@ public class GamePanel extends JPanel implements Runnable{
 
     TileManager tileM = new TileManager(this);
     KeyHandler keyH = new KeyHandler(this);
+    MouseHandler mouseH = new MouseHandler(this);
     Sound music = new Sound();
     Sound se = new Sound();
     Sound phantomVoice = new Sound();
@@ -140,6 +141,8 @@ public class GamePanel extends JPanel implements Runnable{
         this.setBackground(Color.black);
         this.setDoubleBuffered(true);
         this.addKeyListener(keyH);
+        this.addMouseListener(mouseH);
+        this.addMouseMotionListener(mouseH);
         this.setFocusable(true);
         this.setFocusTraversalKeysEnabled(false);
 
@@ -1115,6 +1118,29 @@ public class GamePanel extends JPanel implements Runnable{
 
     public int getMasterVolumePercent() {
         return Math.round(masterVolume * 100);
+    }
+
+    public Point toGamePoint(int panelX, int panelY) {
+        double scale = Math.min((double) getWidth() / screenWidth, (double) getHeight() / screenHeight);
+        if (scale <= 0) {
+            return null;
+        }
+
+        int drawWidth = (int) Math.round(screenWidth * scale);
+        int drawHeight = (int) Math.round(screenHeight * scale);
+        int drawX = (getWidth() - drawWidth) / 2;
+        int drawY = (getHeight() - drawHeight) / 2;
+
+        if (panelX < drawX || panelX >= drawX + drawWidth || panelY < drawY || panelY >= drawY + drawHeight) {
+            return null;
+        }
+
+        int gameX = (int) ((panelX - drawX) / scale);
+        int gameY = (int) ((panelY - drawY) / scale);
+
+        gameX = Math.max(0, Math.min(screenWidth - 1, gameX));
+        gameY = Math.max(0, Math.min(screenHeight - 1, gameY));
+        return new Point(gameX, gameY);
     }
 
 }

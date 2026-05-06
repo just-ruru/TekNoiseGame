@@ -136,6 +136,25 @@ public class UI {
         commandNum = Math.floorMod(commandNum + delta, getTitleCommandCount());
     }
 
+    public boolean selectTitleCommandAt(int x, int y) {
+        int hoveredCommand = getTitleCommandAt(x, y);
+        if (hoveredCommand == -1) {
+            return false;
+        }
+
+        commandNum = hoveredCommand;
+        return true;
+    }
+
+    public boolean activateTitleCommandAt(int x, int y) {
+        if (!selectTitleCommandAt(x, y)) {
+            return false;
+        }
+
+        activateSelectedTitleCommand();
+        return true;
+    }
+
     public void activateSelectedTitleCommand() {
         switch (commandNum) {
             case TITLE_START_COMMAND:
@@ -154,6 +173,16 @@ public class UI {
 
     public int getTitleCommandCount() {
         return titleButtonImages.length;
+    }
+
+    private int getTitleCommandAt(int x, int y) {
+        for (int i = 0; i < titleButtonBounds.length; i++) {
+            if (titleButtonBounds[i].contains(x, y)) {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     public void drawKeyInventory() { // CUSTOM METHOD by Llama -- gi himo ni nako para maapil og wagtang ang key UI text (in draw method) when game is paused
