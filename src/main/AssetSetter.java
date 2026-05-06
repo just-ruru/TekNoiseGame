@@ -44,7 +44,7 @@ public class AssetSetter {
 
         //Bag 18x 1y
         gp.obj[2] = new OBJ_Bag();
-        gp.obj[2].stageX = 18 * gp.tileSize;
+        gp.obj[2].stageX = 19 * gp.tileSize;
         gp.obj[2].stageY = 1 * gp.tileSize;
 
         // Door marker on the map uses tile ID 7 (two tiles stacked at col 41, rows 0-1).

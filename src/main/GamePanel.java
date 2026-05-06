@@ -289,8 +289,10 @@ public class GamePanel extends JPanel implements Runnable{
         int playerCenterY = player.stageY + player.solidArea.y + player.solidArea.height / 2;
         int triggerDistance = tileSize * 5;
         int triggerDistanceSquared = triggerDistance * triggerDistance;
+        int flickerDistance = tileSize * 3;
         int nearestEnemyDistanceSquared = Integer.MAX_VALUE;
         float enemyProximityLevel = 0f;
+        float enemyFlickerLevel = 0f;
 
         for (int i = 0; i < monster.length; i++) {
             if (monster[i] == null) {
@@ -312,10 +314,18 @@ public class GamePanel extends JPanel implements Runnable{
 
         if (playerIsNearEnemy) {
             double nearestDistance = Math.sqrt(nearestEnemyDistanceSquared);
-            enemyProximityLevel = 1f - (float) Math.min(1.0, nearestDistance / triggerDistance);
+            if (vignette.areRoomLightsOn()) {
+                enemyProximityLevel = 1f;
+            } else {
+                enemyProximityLevel = 1f - (float) Math.min(1.0, nearestDistance / triggerDistance);
+            }
+            if (nearestDistance <= flickerDistance) {
+                enemyFlickerLevel = 1f - (float) Math.min(1.0, nearestDistance / flickerDistance);
+            }
         }
 
         vignette.setEnemyProximityLevel(enemyProximityLevel);
+        vignette.setEnemyFlickerLevel(enemyFlickerLevel);
         updatePhantomVoice(getPhantomVoiceTargetVolume(
                 playerIsNearEnemy,
                 nearestEnemyDistanceSquared,
@@ -431,6 +441,10 @@ public class GamePanel extends JPanel implements Runnable{
         fadeAlpha = 0f;
         fadeOutPhase = true;
         gameState = transitionState;
+    }
+
+    public String getCurrentMapPath() {
+        return currentMapPath;
     }
 
     public void run(){

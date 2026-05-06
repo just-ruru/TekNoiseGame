@@ -50,7 +50,7 @@ public class Player extends Entity{
     }
 
     public void setDefaultValues(){
-        speed = 2.5f;
+        speed = 4f;
         direction = "down";
 
         //PLAYER STATUS
@@ -302,18 +302,14 @@ public class Player extends Entity{
                 case "Switch":
                     if (keyH.interactPressed && interactCooldown == 0) {              // E was pressed
                         if (gp.vignette.wereLightsActivated()) {
-                            gp.ui.showMessage("The switch is already on.\n\n"
-                                    + "We need it to stay on, so don't touch it!");
+                            gp.ui.showMessage(getSwitchAlreadyOnDialogue());
                         } else if (!hasReplacementSwitch) {
-                            gp.ui.showMessage("The switch seems to be broken...\n\n"
-                                    + "There should be something here that can fix it.");
+                            gp.ui.showMessage(getBrokenSwitchDialogue());
                         } else if (gp.vignette.turnLightsOn()) {
                             hasReplacementSwitch = false;
-                            gp.ui.showMessage("You replaced the broken switch.\n\n"
-                                    + "Lights are now on.");
+                            gp.ui.showMessage(getSwitchFixedDialogue());
                         } else {
-                            gp.ui.showMessage("The switch is already on.\n\n"
-                                    + "We need it to stay on, so don't touch it!");
+                            gp.ui.showMessage(getSwitchAlreadyOnDialogue());
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -324,14 +320,13 @@ public class Player extends Entity{
                     gp.playSE(3);
                     hasKey++;
                     gp.obj[i]=null;
-                    gp.ui.showMessage("You got a key!\n\nKeys in bag: " + hasKey);
+                    gp.ui.showMessage(getLooseKeyDialogue());
 
                     break;
 
                 case "Empty_Table":
                     if (keyH.interactPressed && interactCooldown == 0) {
-                        gp.ui.showMessage("You searched the table.\n\n"
-                                + "Nothing useful here.");
+                        gp.ui.showMessage(getEmptyTableDialogue());
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -346,9 +341,7 @@ public class Player extends Entity{
                         gp.obj[i] = new objects.OBJ_Empty_Table();
                         gp.obj[i].stageX = tableX;
                         gp.obj[i].stageY = tableY;
-                        gp.ui.showMessage("You searched the table.\n\n"
-                                + "There's a key hidden underneath!\n\n"
-                                + "Keys in bag: " + hasKey);
+                        gp.ui.showMessage(getKeyTableDialogue());
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -359,10 +352,10 @@ public class Player extends Entity{
                         if(hasKey > 0) {
                             gp.playSE(3);
                             hasKey--;
-                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!");
+                            gp.ui.showMessage(getDoorOpenedDialogue());
                             gp.startMapTransition("/maps/stage02.txt");
                         } else {
-                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                            gp.ui.showMessage(getLockedDoorDialogue());
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -374,10 +367,10 @@ public class Player extends Entity{
                         if(hasKey > 0) {
                             gp.playSE(3);
                             hasKey--;
-                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!\n\nEntering a different sized map...");
+                            gp.ui.showMessage(getDoorOpenedDialogue());
                             gp.startMapTransition("/maps/stage03.txt");
                         } else {
-                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                            gp.ui.showMessage(getLockedDoorDialogue());
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -389,10 +382,10 @@ public class Player extends Entity{
                         if(hasKey > 0) {
                             gp.playSE(3);
                             hasKey--;
-                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!\n\nEntering a different sized map...");
+                            gp.ui.showMessage(getDoorOpenedDialogue());
                             gp.startMapTransition("/maps/stage03.txt");
                         } else {
-                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                            gp.ui.showMessage(getLockedDoorDialogue());
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -401,28 +394,7 @@ public class Player extends Entity{
 
                 case "TablePaper":
                     if(keyH.interactPressed && interactCooldown == 0){
-                        gp.ui.showMessage("Name: Jhon Pork Tocino\n\n"
-                        + "Hmmm...... *turns the page\n\n"
-                        + "Scribles* Scribles* \n\n"
-                        + "This is getting creepy...\n\n"
-                        + "*turns the page\n\n"
-                        + "Ooh something is written at the back part\n\n"
-                        + "\"Idk if someone will eventually read this...\"\n\n" + "I am JPT,,, a student just like you\n\n"
-                        + "\"This place... isnt what u think it is...\n\n"
-                        + "\"I've been studying endlessly just like you, with no sleep at all\"\n\n"
-                        + "\"and then I got to class,, fell asleep,, and when I woke up,, I became trapped here\"\n\n"
-                        + "\"I've been wandering around and...\"\n\n" + "\"there's a few things you should now\"\n\n"
-                        + "\"1. there are shadowy creatures here that wander around, avoid them\"\n\n"
-                        + "\"2. you should check the tables with drawers for items\"\n\n" + "\"you should be able to find some eventually...\"\n\n" + " I hope\"\n\n"
-                        + "\"and lastly... I left some couple of pages here and there to maybe help you\"\n\n"
-                        + "\"...\"\n\n"
-                        + "\"You should read them\"\n\n"
-                        + "\"...\"\n\n"
-                        + "\"Anyways, I was trying to fix the switch here but I forgot where my bag was..\"\n\n so maybe find that first---\n\n"
-                        + "\"The lights...\"\n\n\"they're...\"\n\n\"they're...\"\n\n\"here...\"\n\n"
-                        + "\"Remember...\"\n\n\"AVOID THEM!!!!!\"\n\n"
-                        + "The rest of the page was ripped off with some red paint splots over it...\n\n"
-                        + "... I wonder what happened...");
+                        gp.ui.showMessage(getTablePaperDialogue());
 
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -433,8 +405,7 @@ public class Player extends Entity{
                     if (keyH.interactPressed && interactCooldown == 0) {
                         hasReplacementSwitch = true;
                         gp.obj[i] = null;
-                        gp.ui.showMessage("You searched the bag.\n\n"
-                                + "Inside is a spare switch that might fix the lights.");
+                        gp.ui.showMessage(getBagDialogue());
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -442,6 +413,143 @@ public class Player extends Entity{
 
             }
         }
+    }
+
+    private String getStagePath() {
+        return gp.getCurrentMapPath();
+    }
+
+    private boolean isStage(String mapPath) {
+        return mapPath.equals(getStagePath());
+    }
+
+    private String getSwitchAlreadyOnDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "The repaired switch is humming steadily.\n\nLeave it alone. This room needs every bit of light.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "The switch is already holding the lights together.\n\nDo not touch it again.";
+        }
+        return "The switch is already on.\n\nWe need it to stay on, so don't touch it!";
+    }
+
+    private String getBrokenSwitchDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "The switch panel is cracked open.\n\nSomething is missing from inside it.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "The switch is dead.\n\nIt needs a replacement part before it can work.";
+        }
+        return "The switch seems to be broken...\n\nThere should be something here that can fix it.";
+    }
+
+    private String getSwitchFixedDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You fit the spare switch into place.\n\nThe lights struggle, then turn on.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "The replacement switch clicks in.\n\nThe room lights wake up.";
+        }
+        return "You replaced the broken switch.\n\nLights are now on.";
+    }
+
+    private String getLooseKeyDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You found a key.\n\nKeys in bag: " + hasKey;
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "Another key...\n\nKeys in bag: " + hasKey;
+        }
+        return "You got a key!\n\nKeys in bag: " + hasKey;
+    }
+
+    private String getEmptyTableDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You searched the table.\n\nOnly dust and torn notes.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "You checked the table carefully.\n\nNothing but scratches.";
+        }
+        return "You searched the table.\n\nNothing useful here.";
+    }
+
+    private String getKeyTableDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You searched the drawer.\n\nA key was hidden under loose papers.\n\nKeys in bag: " + hasKey;
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "You searched beneath the table.\n\nA cold key was taped underneath.\n\nKeys in bag: " + hasKey;
+        }
+        return "You searched the table.\n\nThere's a key hidden underneath!\n\nKeys in bag: " + hasKey;
+    }
+
+    private String getDoorOpenedDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You used 1 key.\n\nThe next door unlocked.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "You used 1 key.\n\nThe door gives way.";
+        }
+        return "You used 1 key.\n\nThe door opened!";
+    }
+
+    private String getLockedDoorDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "The door will not move.\n\nThere has to be a key somewhere in this room.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "Locked again.\n\nFind the key before this place finds you.";
+        }
+        return "The door is locked.\n\nYou need a key.";
+    }
+
+    private String getTablePaperDialogue() {
+        if(isStage("/maps/stage01.txt")){
+            return "Name: Jhon Pork Tocino\n\n"
+                    + "Hmmm...... *turns the page\n\n"
+                    + "Scribles* Scribles* \n\n"
+                    + "This is getting creepy...\n\n"
+                    + "*turns the page\n\n"
+                    + "Ooh something is written at the back part\n\n"
+                    + "\"Idk if someone will eventually read this...\"\n\n" + "I am JPT,,, a student just like you\n\n"
+                    + "\"This place... isnt what u think it is...\n\n"
+                    + "\"I've been studying endlessly just like you, with no sleep at all\"\n\n"
+                    + "\"and then I got to class,, fell asleep,, and when I woke up,, I became trapped here\"\n\n"
+                    + "\"I've been wandering around and...\"\n\n" + "\"there's a few things you should now\"\n\n"
+                    + "\"1. there are shadowy creatures here that wander around, avoid them\"\n\n"
+                    + "\"2. you should check the tables with drawers for items\"\n\n" + "\"you should be able to find some eventually...\"\n\n" + " I hope\"\n\n"
+                    + "\"and lastly... I left some couple of pages here and there to maybe help you\"\n\n"
+                    + "\"...\"\n\n"
+                    + "\"You should read them\"\n\n"
+                    + "\"...\"\n\n"
+                    + "\"Anyways, I was trying to fix the switch here but I forgot where my bag was..\"\n\n so maybe find that first---\n\n"
+                    + "\"The lights...\"\n\n\"they're...\"\n\n\"they're...\"\n\n\"here...\"\n\n"
+                    + "\"Remember...\"\n\n\"AVOID THEM!!!!!\"\n\n"
+                    + "The rest of the page was ripped off with some red paint splots over it...\n\n"
+                    + "... I wonder what happened...";
+        }
+
+        if (isStage("/maps/stage02.txt")) {
+            return "The paper is covered in smudged diagrams.\n\n"
+                    + "Rooms, doors, switches...\n\n"
+                    + "Someone was trying to understand the pattern.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "The page is almost unreadable.\n\n"
+                    + "One line remains clear:\n\n"
+                    + "\"If the lights fail, run before the whispers get close.\"";
+        }
+        return "bye muna world";
+    }
+
+    private String getBagDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You searched the bag.\n\nThere is another spare switch inside.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "You opened the bag.\n\nA switch part is wrapped in old cloth.";
+        }
+        return "You searched the bag.\n\nInside is a spare switch that might fix the lights.";
     }
 
     public void contactMonster(int i){
