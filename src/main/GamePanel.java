@@ -85,13 +85,21 @@ public class GamePanel extends JPanel implements Runnable{
     public final  int pauseState = 2;
     public final int transitionState = 3;
     public final int cutsceneState = 4;
+    private static final int TRANSITION_NONE = 0;
+    private static final int TRANSITION_MAP = 1;
+    private static final int TRANSITION_TITLE_START = 2;
 
     // MAP / TRANSITION
     private String currentMapPath = "/maps/stage01.txt";
     private String nextMapPath = null;
     private float fadeAlpha = 0f; // 0..1
     private final float fadeSpeed = 0.3f;
+    private final float titleStartFadeSpeed = 0.01f;
+    private static final int TITLE_START_BLACK_HOLD_TICKS = 14;
     private boolean fadeOutPhase = true;
+    private int activeTransitionType = TRANSITION_NONE;
+    private boolean showTitleDuringTransition = false;
+    private int transitionHoldTicks = 0;
     private float phantomVoiceVolume = 0f;
     private final float phantomVoiceFadeSpeed = 0.15f;
     private final float musicVolumeDuringPhantomVoice = 0.015f;
@@ -289,6 +297,35 @@ public class GamePanel extends JPanel implements Runnable{
     public void startGameThread(){
         gameThread = new Thread(this);
         gameThread.start();
+    }
+
+    public void startGameFromTitle() {
+        if (gameState == transitionState) {
+            return;
+        }
+
+        fadeAlpha = 1f;
+        fadeOutPhase = false;
+        activeTransitionType = TRANSITION_TITLE_START;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = TITLE_START_BLACK_HOLD_TICKS;
+        playMusic(1);
+        ui.showMessage("woke up*\n\n"
+                + "what's happening... \n\n"
+                + "Its so dark...\n\n"
+                + "where is everybody...");
+        gameState = transitionState;
+    }
+
+    public void exitGame() {
+        System.exit(0);
+    }
+
+    public boolean shouldDrawTitleScreen() {
+        return gameState == titleState
+                || (gameState == transitionState
+                && activeTransitionType == TRANSITION_TITLE_START
+                && showTitleDuringTransition);
     }
 
     public void update(){
@@ -526,9 +563,28 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     private void updateTransition() {
+        if (activeTransitionType == TRANSITION_TITLE_START) {
+            updateTitleStartTransition();
+            return;
+        }
+
+        if (activeTransitionType != TRANSITION_MAP) {
+            fadeAlpha = 0f;
+            fadeOutPhase = true;
+            showTitleDuringTransition = false;
+            transitionHoldTicks = 0;
+            activeTransitionType = TRANSITION_NONE;
+            gameState = playState;
+            return;
+        }
+
         if (nextMapPath == null) {
             // Safety: cancel transition if no target set.
             fadeAlpha = 0f;
+            fadeOutPhase = true;
+            showTitleDuringTransition = false;
+            transitionHoldTicks = 0;
+            activeTransitionType = TRANSITION_NONE;
             gameState = playState;
             return;
         }
@@ -570,8 +626,26 @@ public class GamePanel extends JPanel implements Runnable{
                 fadeAlpha = 0f;
                 nextMapPath = null;
                 fadeOutPhase = true;
+                activeTransitionType = TRANSITION_NONE;
                 gameState = playState;
             }
+        }
+    }
+
+    private void updateTitleStartTransition() {
+        if (transitionHoldTicks > 0) {
+            transitionHoldTicks--;
+            return;
+        }
+
+        fadeAlpha -= titleStartFadeSpeed;
+        if (fadeAlpha <= 0f) {
+            fadeAlpha = 0f;
+            fadeOutPhase = true;
+            showTitleDuringTransition = false;
+            transitionHoldTicks = 0;
+            activeTransitionType = TRANSITION_NONE;
+            gameState = playState;
         }
     }
 
@@ -580,6 +654,9 @@ public class GamePanel extends JPanel implements Runnable{
         nextMapPath = mapPath;
         fadeAlpha = 0f;
         fadeOutPhase = true;
+        activeTransitionType = TRANSITION_MAP;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = 0;
         gameState = transitionState;
     }
 
@@ -592,6 +669,9 @@ public class GamePanel extends JPanel implements Runnable{
         nextMapPath = null;
         fadeAlpha = 0f;
         fadeOutPhase = true;
+        activeTransitionType = TRANSITION_NONE;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = 0;
 
         tileM.loadMap(currentMapPath);
         currentMapConfig = tileM.getCurrentMapConfig();
@@ -943,8 +1023,9 @@ public class GamePanel extends JPanel implements Runnable{
         //Note: The order of rendering is so important, basically first rendered is the bottom most layer
         //followed by the next, this is how to create a layering system in the game.
 
-        if(gameState == titleState) {
+        if (shouldDrawTitleScreen()) {
             ui.draw(g2);
+            drawTransitionOverlay(g2);
             return;
         }
 
@@ -974,7 +1055,10 @@ public class GamePanel extends JPanel implements Runnable{
         vignette.draw(g2, player.screenX, player.screenY, tileSize, tileSize);
         ui.draw(g2);
 
-        // Fade overlay (draw last so it covers everything)
+        drawTransitionOverlay(g2);
+    }
+
+    private void drawTransitionOverlay(Graphics2D g2) {
         if (gameState == transitionState && fadeAlpha > 0f) {
             Composite old = g2.getComposite();
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
