@@ -263,14 +263,19 @@ public class GamePanel extends JPanel implements Runnable{
         }
         if(gameState == playState) {
             player.update();
-            for(int i = 0; i < monster.length; i++) {
-                if(monster[i] != null) {
-                    monster[i].update();
-                }
-            }
 
-            stageTicks++;
-            checkTileThoughtTriggers();
+            if (!ui.isDialogueActive()) {
+                for(int i = 0; i < monster.length; i++) {
+                    if(monster[i] != null) {
+                        monster[i].update();
+                    }
+                }
+
+                stageTicks++;
+                checkTileThoughtTriggers();
+                checkEnemyProximityDimming();
+                vignette.update();
+            }
         }
         if(gameState == pauseState) {
             //nothing
@@ -279,8 +284,10 @@ public class GamePanel extends JPanel implements Runnable{
             updateTransition();
         }
         ui.update();
-        checkEnemyProximityDimming();
-        vignette.update();
+        if (gameState != playState) {
+            checkEnemyProximityDimming();
+            vignette.update();
+        }
     }
 
     private void checkEnemyProximityDimming() {
