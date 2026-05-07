@@ -20,6 +20,10 @@ public class UI {
     private static final int TITLE_EXIT_COMMAND = 3;
     private static final int TITLE_BUTTON_WIDTH = 224;
     private static final int TITLE_BUTTON_HEIGHT = 56;
+    private static final Font INTERACTION_PROMPT_FONT = new Font("Arial", Font.BOLD, 12);
+    private static final long INTERACTION_PROMPT_DURATION_NS = 5_000_000_000L;
+    private static final double INTERACTION_PROMPT_BOUNCE_SPEED = 5.5;
+    private static final int INTERACTION_PROMPT_BOUNCE_HEIGHT = 4;
 
     GamePanel gp;
     Graphics2D g2;
@@ -31,6 +35,9 @@ public class UI {
     private final Rectangle titleBackgroundBounds;
     private final BufferedImage[] titleButtonImages;
     private final Rectangle[] titleButtonBounds;
+    private int activePromptObjectIndex = 999;
+    private String activePromptText = null;
+    private long activePromptExpiresAt = 0L;
     public int commandNum = 0;
 
     public UI(GamePanel gp) {
@@ -69,6 +76,7 @@ public class UI {
 
     public void update() {
         dialogueBox.update();
+        updateInteractionPrompt();
     }
 
     public boolean isDialogueActive() {
@@ -93,6 +101,7 @@ public class UI {
             drawKeyInventory();
             drawStaminaBar();
             drawAxeCooldown();
+            drawInteractionPrompt();
         }
 
         if (gp.gameState == gp.pauseState) {
@@ -300,6 +309,181 @@ public class UI {
         int textY = y + ((height - fm.getHeight()) / 2) + fm.getAscent();
         g2.drawString(text, textX, textY);
         g2.setFont(oldFont);
+    }
+
+    private void updateInteractionPrompt() {
+        if (gp.gameState != gp.playState || isDialogueActive()) {
+            clearActivePrompt();
+            return;
+        }
+
+        int objectIndex = findPromptObjectIndex();
+        if (objectIndex == 999) {
+            clearActivePrompt();
+            return;
+        }
+
+        SuperObject object = gp.obj[objectIndex];
+        String prompt = getInteractionPrompt(object);
+        if (prompt == null) {
+            clearActivePrompt();
+            return;
+        }
+
+        if (objectIndex != activePromptObjectIndex || !prompt.equals(activePromptText)) {
+            activePromptObjectIndex = objectIndex;
+            activePromptText = prompt;
+            activePromptExpiresAt = System.nanoTime() + INTERACTION_PROMPT_DURATION_NS;
+        }
+    }
+
+    private void drawInteractionPrompt() {
+        if (activePromptObjectIndex == 999 || activePromptText == null || System.nanoTime() > activePromptExpiresAt) {
+            return;
+        }
+
+        if (activePromptObjectIndex >= gp.obj.length) {
+            clearActivePrompt();
+            return;
+        }
+
+        SuperObject object = gp.obj[activePromptObjectIndex];
+        if (object == null) {
+            clearActivePrompt();
+            return;
+        }
+
+        int objectCenterX = object.stageX + object.solidArea.x + object.solidArea.width / 2;
+        int objectTopY = object.stageY + object.solidArea.y;
+        Point promptPoint = gp.stageToScreenPoint(objectCenterX, objectTopY);
+
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+        Composite oldComposite = g2.getComposite();
+
+        g2.setFont(INTERACTION_PROMPT_FONT);
+        FontMetrics fm = g2.getFontMetrics();
+        double seconds = System.nanoTime() / 1_000_000_000.0;
+        int bounceOffset = (int) Math.round(Math.sin(seconds * INTERACTION_PROMPT_BOUNCE_SPEED) * INTERACTION_PROMPT_BOUNCE_HEIGHT);
+        int textWidth = fm.stringWidth(activePromptText);
+        int textX = Math.max(8, Math.min(gp.screenWidth - textWidth - 8, promptPoint.x - textWidth / 2));
+        int textY = Math.max(fm.getAscent() + 8, promptPoint.y - 10 + bounceOffset);
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.65f));
+        g2.setColor(new Color(0, 0, 0, 180));
+        g2.drawString(activePromptText, textX + 1, textY + 1);
+
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(new Color(248, 242, 225));
+        g2.drawString(activePromptText, textX, textY);
+
+        g2.setComposite(oldComposite);
+        g2.setColor(oldColor);
+        g2.setFont(oldFont);
+    }
+
+    private void clearActivePrompt() {
+        activePromptObjectIndex = 999;
+        activePromptText = null;
+        activePromptExpiresAt = 0L;
+    }
+
+    private int findPromptObjectIndex() {
+        Rectangle interactionArea = getPlayerInteractionArea();
+        int closestIndex = 999;
+        int closestDistanceSquared = Integer.MAX_VALUE;
+        int playerCenterX = gp.player.stageX + gp.player.solidArea.x + gp.player.solidArea.width / 2;
+        int playerCenterY = gp.player.stageY + gp.player.solidArea.y + gp.player.solidArea.height / 2;
+
+        for (int i = 0; i < gp.obj.length; i++) {
+            SuperObject object = gp.obj[i];
+            if (object == null || getInteractionPrompt(object) == null) {
+                continue;
+            }
+
+            Rectangle objectArea = getObjectStageArea(object);
+            if (!interactionArea.intersects(objectArea)) {
+                continue;
+            }
+
+            int objectCenterX = objectArea.x + objectArea.width / 2;
+            int objectCenterY = objectArea.y + objectArea.height / 2;
+            int dx = playerCenterX - objectCenterX;
+            int dy = playerCenterY - objectCenterY;
+            int distanceSquared = dx * dx + dy * dy;
+            if (distanceSquared < closestDistanceSquared) {
+                closestDistanceSquared = distanceSquared;
+                closestIndex = i;
+            }
+        }
+
+        return closestIndex;
+    }
+
+    private Rectangle getPlayerInteractionArea() {
+        Rectangle area = new Rectangle(
+                gp.player.stageX + gp.player.solidArea.x,
+                gp.player.stageY + gp.player.solidArea.y,
+                gp.player.solidArea.width,
+                gp.player.solidArea.height);
+        int distance = gp.tileSize / 2;
+
+        switch (gp.player.direction) {
+            case "up":
+                area.y -= distance;
+                break;
+            case "down":
+                area.y += distance;
+                break;
+            case "left":
+                area.x -= distance;
+                break;
+            case "right":
+                area.x += distance;
+                break;
+            default:
+                break;
+        }
+
+        return area;
+    }
+
+    private Rectangle getObjectStageArea(SuperObject object) {
+        return new Rectangle(
+                object.stageX + object.solidArea.x,
+                object.stageY + object.solidArea.y,
+                object.solidArea.width,
+                object.solidArea.height);
+    }
+
+    private String getInteractionPrompt(SuperObject object) {
+        switch (object.name) {
+            case "Empty_Table":
+            case "Key_Table":
+                return "Press E to search";
+            case "TablePaper":
+                return "Press E to read";
+            case "Bag":
+            case "Axe":
+                return "Press E to pick up";
+            case "DoorStage1":
+            case "DoorStage3":
+                return "Press E to open";
+            case "DoorStage2":
+                return gp.player.hasAxe ? "Press E to break" : "Press E to inspect";
+            case "BreakableTable":
+                return gp.player.hasAxe ? "Press E to break" : "Press E to inspect";
+            case "HealthBag":
+                return "Press E to use";
+            case "Candle":
+                return "Press E to light";
+            case "Switch":
+                return "Press E to flip";
+            case "JhonPorkJerkyJake":
+                return "Press E to talk";
+            default:
+                return null;
+        }
     }
 
     private BufferedImage loadTitleBackgroundImage() {

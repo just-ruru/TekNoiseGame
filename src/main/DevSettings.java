@@ -13,11 +13,15 @@ public class DevSettings {
     private boolean lightsOn = false;
     private boolean axeMania = false;
     private int selectedOption = 0;
+    private int selectedSpeedIndex = 0;
     private int selectedStageIndex = 0;
-    private static final int OPTION_COUNT = 5;
-    private static final int OPTION_STAGE_SELECT = 4;
+    private static final int OPTION_COUNT = 6;
+    private static final int OPTION_SPEED_SELECT = 4;
+    private static final int OPTION_STAGE_SELECT = 5;
     private final String[] stageNames = {"Stage 1", "Stage 2", "Stage 3"};
     private final String[] stagePaths = {"/maps/stage01.txt", "/maps/stage02.txt", "/maps/stage03.txt"};
+    private final String[] speedNames = {"Normal", "Dev", "Fast AF Boi"};
+    private final float[] speedValues = {2.5f, 4f, 6f};
 
     public DevSettings(GamePanel gp) {
         this.gp = gp;
@@ -49,6 +53,22 @@ public class DevSettings {
             selectedOption++;
             if (selectedOption >= OPTION_COUNT) {
                 selectedOption = 0;
+            }
+            return true;
+        }
+
+        if (selectedOption == OPTION_SPEED_SELECT && (code == KeyEvent.VK_A || code == KeyEvent.VK_LEFT)) {
+            selectedSpeedIndex--;
+            if (selectedSpeedIndex < 0) {
+                selectedSpeedIndex = speedValues.length - 1;
+            }
+            return true;
+        }
+
+        if (selectedOption == OPTION_SPEED_SELECT && (code == KeyEvent.VK_D || code == KeyEvent.VK_RIGHT)) {
+            selectedSpeedIndex++;
+            if (selectedSpeedIndex >= speedValues.length) {
+                selectedSpeedIndex = 0;
             }
             return true;
         }
@@ -99,6 +119,10 @@ public class DevSettings {
         return TEST_MODE && unlimitedHealth;
     }
 
+    public float getPlayerBaseSpeed() {
+        return speedValues[selectedSpeedIndex];
+    }
+
     public void applyContinuousEffects() {
         if (isUnlimitedHealthEnabled()) {
             gp.player.life = gp.player.maxLife;
@@ -121,7 +145,7 @@ public class DevSettings {
         int panelX = gp.tileSize;
         int panelY = gp.tileSize;
         int panelW = gp.screenWidth - gp.tileSize * 2;
-        int panelH = gp.tileSize * 8;
+        int panelH = gp.tileSize * 9;
 
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.75f));
         g2.setColor(Color.BLACK);
@@ -140,7 +164,8 @@ public class DevSettings {
         drawOption(g2, 1, unlimitedHealth ? "[x] Unlimited health" : "[ ] Unlimited health", panelX, panelY + 126);
         drawOption(g2, 2, lightsOn ? "[x] Light on" : "[ ] Light on", panelX, panelY + 164);
         drawOption(g2, 3, axeMania ? "[x] Axe mania" : "[ ] Axe mania", panelX, panelY + 202);
-        drawOption(g2, OPTION_STAGE_SELECT, "Stage select: < " + stageNames[selectedStageIndex] + " >", panelX, panelY + 240);
+        drawOption(g2, OPTION_SPEED_SELECT, "Speed: < " + speedNames[selectedSpeedIndex] + " (" + speedValues[selectedSpeedIndex] + "f) >", panelX, panelY + 240);
+        drawOption(g2, OPTION_STAGE_SELECT, "Stage select: < " + stageNames[selectedStageIndex] + " >", panelX, panelY + 278);
 
         g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
         g2.setColor(new Color(210, 210, 210));

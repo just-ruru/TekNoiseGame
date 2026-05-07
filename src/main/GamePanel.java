@@ -131,6 +131,7 @@ public class GamePanel extends JPanel implements Runnable{
     private final int[] candleSequence = {1, 4, 2, 3};
     private final java.util.List<Integer> litCandleOrder = new ArrayList<>();
     private boolean candlePuzzleSolved = false;
+    private String pendingStartDialogue = null;
 
     int playerX = player.stageX;
     int playerY = player.stageY;
@@ -313,10 +314,10 @@ public class GamePanel extends JPanel implements Runnable{
         showTitleDuringTransition = false;
         transitionHoldTicks = TITLE_START_BLACK_HOLD_TICKS;
         playMusic(1);
-        ui.showMessage("woke up*\n\n"
+        pendingStartDialogue = "woke up*\n\n"
                 + "what's happening... \n\n"
                 + "Its so dark...\n\n"
-                + "where is everybody...");
+                + "where is everybody...";
         gameState = transitionState;
     }
 
@@ -649,6 +650,10 @@ public class GamePanel extends JPanel implements Runnable{
             transitionHoldTicks = 0;
             activeTransitionType = TRANSITION_NONE;
             gameState = playState;
+            if (pendingStartDialogue != null) {
+                ui.showMessage(pendingStartDialogue);
+                pendingStartDialogue = null;
+            }
         }
     }
 
@@ -708,6 +713,14 @@ public class GamePanel extends JPanel implements Runnable{
 
     public int getCameraStageY() {
         return Math.round(cameraStageY);
+    }
+
+    public Point stageToScreenPoint(int stageX, int stageY) {
+        double screenX = stageX - getCameraStageX() + player.screenX;
+        double screenY = stageY - getCameraStageY() + player.screenY;
+        screenX = (screenX - screenWidth / 2.0) * cameraZoom + screenWidth / 2.0;
+        screenY = (screenY - screenHeight / 2.0) * cameraZoom + screenHeight / 2.0;
+        return new Point((int) Math.round(screenX), (int) Math.round(screenY));
     }
 
     public boolean isPathTileBlocked(int col, int row) {

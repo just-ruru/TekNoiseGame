@@ -12,8 +12,8 @@ import java.io.IOException;
 import main.Sound;
 
 public class Player extends Entity{
-    private static final float WALK_SPEED = 4f;
-    private static final float SPRINT_SPEED = 4f;
+    private static final float DEFAULT_WALK_SPEED = 2.5f;
+    private static final float SPRINT_SPEED_MULTIPLIER = 1.6f;
     private static final float EXHAUSTED_SPEED = 1f;
     private static final int MAX_STAMINA_TICKS = 200;
     private static final int EXHAUSTED_TICKS = 180;
@@ -68,7 +68,7 @@ public class Player extends Entity{
     }
 
     public void setDefaultValues(){
-        speed = WALK_SPEED;
+        speed = gp != null ? gp.devSettings.getPlayerBaseSpeed() : DEFAULT_WALK_SPEED;
         direction = "down";
         staminaTicks = MAX_STAMINA_TICKS;
         exhaustedTicksRemaining = 0;
@@ -703,6 +703,9 @@ public class Player extends Entity{
     }
 
     private void updateSprintState(boolean moving) {
+        float baseWalkSpeed = gp.devSettings.getPlayerBaseSpeed();
+        float sprintSpeed = baseWalkSpeed * SPRINT_SPEED_MULTIPLIER;
+
         if (exhaustedTicksRemaining > 0) {
             exhaustedTicksRemaining--;
             speed = EXHAUSTED_SPEED;
@@ -711,7 +714,7 @@ public class Player extends Entity{
 
         if (sprintCooldownTicksRemaining > 0) {
             sprintCooldownTicksRemaining--;
-            speed = WALK_SPEED;
+            speed = baseWalkSpeed;
             if (sprintCooldownTicksRemaining == 0) {
                 staminaTicks = MAX_STAMINA_TICKS;
                 staminaRegenCounter = 0;
@@ -721,7 +724,7 @@ public class Player extends Entity{
 
         boolean canSprint = moving && keyH.sprintPressed && staminaTicks > 0;
         if (canSprint) {
-            speed = SPRINT_SPEED;
+            speed = sprintSpeed;
             staminaTicks--;
             staminaRegenCounter = 0;
 
@@ -734,7 +737,7 @@ public class Player extends Entity{
             return;
         }
 
-        speed = WALK_SPEED;
+        speed = baseWalkSpeed;
         if (staminaTicks < MAX_STAMINA_TICKS) {
             staminaRegenCounter++;
             if (staminaRegenCounter >= STAMINA_REGEN_TICKS_PER_POINT) {
