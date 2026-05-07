@@ -2,6 +2,9 @@ package main;
 
 import entity.Entity;
 import entity.Player;
+import main.monster.MON_MinionWitherSlime;
+import main.monster.MON_Stage2WitherBoss;
+import npc.NPC_JhonPorkJerkyJake;
 import objects.SuperObject;
 import tile.TileManager;
 
@@ -60,18 +63,20 @@ public class GamePanel extends JPanel implements Runnable{
 
     TileManager tileM = new TileManager(this);
     KeyHandler keyH = new KeyHandler(this);
+    MouseHandler mouseH = new MouseHandler(this);
     Sound music = new Sound();
     Sound se = new Sound();
     Sound phantomVoice = new Sound();
     public CollisionChecker cChecker = new CollisionChecker(this);
     public AssetSetter assetSetter = new AssetSetter(this);
     public UI ui = new UI(this);
+    public DevSettings devSettings = new DevSettings(this);
 
     Thread gameThread;
 
     // ENTITY AND OBJECT
     public Player player = new Player(this,keyH, choice);
-    public SuperObject obj[]= new SuperObject[30];
+    public SuperObject obj[]= new SuperObject[120];
     public Entity monster[] = new Entity[20];
 
     // GAME STATE
@@ -80,13 +85,22 @@ public class GamePanel extends JPanel implements Runnable{
     public final int playState = 1;
     public final  int pauseState = 2;
     public final int transitionState = 3;
+    public final int cutsceneState = 4;
+    private static final int TRANSITION_NONE = 0;
+    private static final int TRANSITION_MAP = 1;
+    private static final int TRANSITION_TITLE_START = 2;
 
     // MAP / TRANSITION
     private String currentMapPath = "/maps/stage01.txt";
     private String nextMapPath = null;
     private float fadeAlpha = 0f; // 0..1
     private final float fadeSpeed = 0.3f;
+    private final float titleStartFadeSpeed = 0.01f;
+    private static final int TITLE_START_BLACK_HOLD_TICKS = 14;
     private boolean fadeOutPhase = true;
+    private int activeTransitionType = TRANSITION_NONE;
+    private boolean showTitleDuringTransition = false;
+    private int transitionHoldTicks = 0;
     private float phantomVoiceVolume = 0f;
     private final float phantomVoiceFadeSpeed = 0.15f;
     private final float musicVolumeDuringPhantomVoice = 0.015f;
@@ -95,6 +109,29 @@ public class GamePanel extends JPanel implements Runnable{
     private final float startingMasterVolume = 0.7f;
     private float masterVolume = startingMasterVolume;
     private final float volumeStep = 0.1f;
+    private float cameraStageX;
+    private float cameraStageY;
+    private static final float CAMERA_PAN_SPEED = 5f;
+    private static final int CUTSCENE_HOLD_TICKS = 45;
+    private static final int CUTSCENE_NONE = 0;
+    private static final int CUTSCENE_STAGE1_LIGHTS_TO_DOOR = 1;
+    private static final int CUTSCENE_STAGE2_BOSS_INTRO = 2;
+    private static final int CUTSCENE_PHASE_PAN_TO_TARGET = 0;
+    private static final int CUTSCENE_PHASE_WAIT_FOR_DIALOGUE = 1;
+    private static final int CUTSCENE_PHASE_RETURN_TO_PLAYER = 2;
+    private int activeCutscene = CUTSCENE_NONE;
+    private int cutscenePhase = CUTSCENE_PHASE_PAN_TO_TARGET;
+    private int cutsceneHoldTicks = 0;
+    private float cutsceneTargetStageX;
+    private float cutsceneTargetStageY;
+    private boolean stage01DoorRevealPlayed = false;
+    private boolean stage02BossIntroPlayed = false;
+    private boolean stage02BossActivated = false;
+    private int minionEffectTicks = 0;
+    private final int[] candleSequence = {1, 4, 2, 3};
+    private final java.util.List<Integer> litCandleOrder = new ArrayList<>();
+    private boolean candlePuzzleSolved = false;
+    private String pendingStartDialogue = null;
 
     int playerX = player.stageX;
     int playerY = player.stageY;
@@ -105,7 +142,10 @@ public class GamePanel extends JPanel implements Runnable{
         this.setBackground(Color.black);
         this.setDoubleBuffered(true);
         this.addKeyListener(keyH);
+        this.addMouseListener(mouseH);
+        this.addMouseMotionListener(mouseH);
         this.setFocusable(true);
+        this.setFocusTraversalKeysEnabled(false);
 
         // Initialize map config based on default map
         currentMapConfig = MapConfig.getConfigForMap(currentMapPath, tileSize);
@@ -240,10 +280,16 @@ public class GamePanel extends JPanel implements Runnable{
     public void setupGame() {
         // Stage start: keys are per-stage and shouldn't carry over.
         resetStageThoughtState();
+        stage01DoorRevealPlayed = false;
+        stage02BossIntroPlayed = false;
+        stage02BossActivated = false;
+        activeCutscene = CUTSCENE_NONE;
+        resetCandlePuzzleState();
         player.hasKey = 0;
         player.hasReplacementSwitch = false;
         player.setDefaultValues();
         player.setSpawnForMap(currentMapPath);
+        snapCameraToPlayer();
         assetSetter.setObject(currentMapPath);
 //        assetSetter.setObject();
         assetSetter.setMonster(currentMapPath);
@@ -257,30 +303,152 @@ public class GamePanel extends JPanel implements Runnable{
         gameThread.start();
     }
 
+    public void startGameFromTitle() {
+        if (gameState == transitionState) {
+            return;
+        }
+
+        fadeAlpha = 1f;
+        fadeOutPhase = false;
+        activeTransitionType = TRANSITION_TITLE_START;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = TITLE_START_BLACK_HOLD_TICKS;
+        playMusic(1);
+        pendingStartDialogue = "woke up*\n\n"
+                + "what's happening... \n\n"
+                + "Its so dark...\n\n"
+                + "where is everybody...";
+        gameState = transitionState;
+    }
+
+    public void exitGame() {
+        System.exit(0);
+    }
+
+    public boolean shouldDrawTitleScreen() {
+        return gameState == titleState
+                || (gameState == transitionState
+                && activeTransitionType == TRANSITION_TITLE_START
+                && showTitleDuringTransition);
+    }
+
     public void update(){
         if(interactCooldown > 0) {
             interactCooldown--;
         }
         if(gameState == playState) {
+            devSettings.applyContinuousEffects();
+            updateTemporaryEffects();
             player.update();
-            for(int i = 0; i < monster.length; i++) {
-                if(monster[i] != null) {
-                    monster[i].update();
-                }
-            }
+            updateCameraFollowPlayer();
+            updateStageObjects();
 
-            stageTicks++;
-            checkTileThoughtTriggers();
+            if (!ui.isDialogueActive()) {
+                for(int i = 0; i < monster.length; i++) {
+                    if(monster[i] != null) {
+                        monster[i].update();
+                        if (monster[i] != null && monster[i].removeFromWorld) {
+                            monster[i] = null;
+                        }
+                    }
+                }
+
+                stageTicks++;
+                checkTileThoughtTriggers();
+                checkEnemyProximityDimming();
+                vignette.update();
+            }
         }
         if(gameState == pauseState) {
             //nothing
+        }
+        if (gameState == cutsceneState) {
+            updateCutscene();
         }
         if (gameState == transitionState) {
             updateTransition();
         }
         ui.update();
-        checkEnemyProximityDimming();
-        vignette.update();
+        if (gameState == cutsceneState && ui.isDialogueActive() && keyH.interactPressed) {
+            ui.advanceDialogue();
+            keyH.interactPressed = false;
+        }
+        if (gameState != playState && gameState != cutsceneState) {
+            checkEnemyProximityDimming();
+            vignette.update();
+        }
+    }
+
+    private void updateCameraFollowPlayer() {
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+    }
+
+    private void snapCameraToPlayer() {
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+    }
+
+    private boolean moveCameraToward(float targetX, float targetY, float speed) {
+        float dx = targetX - cameraStageX;
+        float dy = targetY - cameraStageY;
+        double distance = Math.sqrt((dx * dx) + (dy * dy));
+        if (distance <= speed) {
+            cameraStageX = targetX;
+            cameraStageY = targetY;
+            return true;
+        }
+
+        cameraStageX += (float) ((dx / distance) * speed);
+        cameraStageY += (float) ((dy / distance) * speed);
+        return false;
+    }
+
+    private void updateCutscene() {
+        updateCutsceneEntityAnimations();
+
+        if (activeCutscene == CUTSCENE_STAGE1_LIGHTS_TO_DOOR) {
+            updateStage1DoorRevealCutscene();
+        }
+        if (activeCutscene == CUTSCENE_STAGE2_BOSS_INTRO) {
+            updateStage2BossIntroCutscene();
+        }
+    }
+
+    private void updateCutsceneEntityAnimations() {
+        for (Entity entity : monster) {
+            if (entity != null) {
+                entity.updateAnimationOnly();
+            }
+        }
+    }
+
+    private void updateStage1DoorRevealCutscene() {
+        if (cutscenePhase == CUTSCENE_PHASE_PAN_TO_TARGET) {
+            if (moveCameraToward(cutsceneTargetStageX, cutsceneTargetStageY, CAMERA_PAN_SPEED)) {
+                if (cutsceneHoldTicks > 0) {
+                    cutsceneHoldTicks--;
+                } else {
+                    ui.showMessage("ah so there's the door");
+                    cutscenePhase = CUTSCENE_PHASE_WAIT_FOR_DIALOGUE;
+                }
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_PHASE_WAIT_FOR_DIALOGUE) {
+            if (!ui.isDialogueActive()) {
+                cutscenePhase = CUTSCENE_PHASE_RETURN_TO_PLAYER;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_PHASE_RETURN_TO_PLAYER) {
+            if (moveCameraToward(player.stageX, player.stageY, CAMERA_PAN_SPEED)) {
+                activeCutscene = CUTSCENE_NONE;
+                gameState = playState;
+            }
+        }
     }
 
     private void checkEnemyProximityDimming() {
@@ -289,8 +457,17 @@ public class GamePanel extends JPanel implements Runnable{
         int playerCenterY = player.stageY + player.solidArea.y + player.solidArea.height / 2;
         int triggerDistance = tileSize * 5;
         int triggerDistanceSquared = triggerDistance * triggerDistance;
+        int flickerDistance = tileSize * 3;
         int nearestEnemyDistanceSquared = Integer.MAX_VALUE;
         float enemyProximityLevel = 0f;
+        float enemyFlickerLevel = 0f;
+
+        if (minionEffectTicks > 0) {
+            vignette.setEnemyProximityLevel(1f);
+            vignette.setEnemyFlickerLevel(1f);
+            updatePhantomVoice(phantomVoiceMaxVolume);
+            return;
+        }
 
         for (int i = 0; i < monster.length; i++) {
             if (monster[i] == null) {
@@ -312,10 +489,18 @@ public class GamePanel extends JPanel implements Runnable{
 
         if (playerIsNearEnemy) {
             double nearestDistance = Math.sqrt(nearestEnemyDistanceSquared);
-            enemyProximityLevel = 1f - (float) Math.min(1.0, nearestDistance / triggerDistance);
+            if (vignette.areRoomLightsOn()) {
+                enemyProximityLevel = 1f;
+            } else {
+                enemyProximityLevel = 1f - (float) Math.min(1.0, nearestDistance / triggerDistance);
+            }
+            if (nearestDistance <= flickerDistance) {
+                enemyFlickerLevel = 1f - (float) Math.min(1.0, nearestDistance / flickerDistance);
+            }
         }
 
         vignette.setEnemyProximityLevel(enemyProximityLevel);
+        vignette.setEnemyFlickerLevel(enemyFlickerLevel);
         updatePhantomVoice(getPhantomVoiceTargetVolume(
                 playerIsNearEnemy,
                 nearestEnemyDistanceSquared,
@@ -382,9 +567,28 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     private void updateTransition() {
+        if (activeTransitionType == TRANSITION_TITLE_START) {
+            updateTitleStartTransition();
+            return;
+        }
+
+        if (activeTransitionType != TRANSITION_MAP) {
+            fadeAlpha = 0f;
+            fadeOutPhase = true;
+            showTitleDuringTransition = false;
+            transitionHoldTicks = 0;
+            activeTransitionType = TRANSITION_NONE;
+            gameState = playState;
+            return;
+        }
+
         if (nextMapPath == null) {
             // Safety: cancel transition if no target set.
             fadeAlpha = 0f;
+            fadeOutPhase = true;
+            showTitleDuringTransition = false;
+            transitionHoldTicks = 0;
+            activeTransitionType = TRANSITION_NONE;
             gameState = playState;
             return;
         }
@@ -404,10 +608,16 @@ public class GamePanel extends JPanel implements Runnable{
 
                 // Reset "once per stage" thought state after the map changes.
                 resetStageThoughtState();
+                int currentLife = player.life;
                 player.setDefaultValues();
+                player.life = Math.min(currentLife, player.maxLife);
                 player.setSpawnForMap(currentMapPath);
+                snapCameraToPlayer();
                 player.hasKey = 0; // keys are per-stage
                 player.hasReplacementSwitch = false; // repair parts are per-stage
+                resetCandlePuzzleState();
+                stage02BossIntroPlayed = false;
+                stage02BossActivated = false;
                 assetSetter.setObject(currentMapPath);
                 assetSetter.setMonster(currentMapPath);
 
@@ -420,7 +630,29 @@ public class GamePanel extends JPanel implements Runnable{
                 fadeAlpha = 0f;
                 nextMapPath = null;
                 fadeOutPhase = true;
+                activeTransitionType = TRANSITION_NONE;
                 gameState = playState;
+            }
+        }
+    }
+
+    private void updateTitleStartTransition() {
+        if (transitionHoldTicks > 0) {
+            transitionHoldTicks--;
+            return;
+        }
+
+        fadeAlpha -= titleStartFadeSpeed;
+        if (fadeAlpha <= 0f) {
+            fadeAlpha = 0f;
+            fadeOutPhase = true;
+            showTitleDuringTransition = false;
+            transitionHoldTicks = 0;
+            activeTransitionType = TRANSITION_NONE;
+            gameState = playState;
+            if (pendingStartDialogue != null) {
+                ui.showMessage(pendingStartDialogue);
+                pendingStartDialogue = null;
             }
         }
     }
@@ -430,7 +662,323 @@ public class GamePanel extends JPanel implements Runnable{
         nextMapPath = mapPath;
         fadeAlpha = 0f;
         fadeOutPhase = true;
+        activeTransitionType = TRANSITION_MAP;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = 0;
         gameState = transitionState;
+    }
+
+    public void loadStageForTesting(String mapPath) {
+        if (!DevSettings.TEST_MODE) {
+            return;
+        }
+
+        currentMapPath = mapPath;
+        nextMapPath = null;
+        fadeAlpha = 0f;
+        fadeOutPhase = true;
+        activeTransitionType = TRANSITION_NONE;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = 0;
+
+        tileM.loadMap(currentMapPath);
+        currentMapConfig = tileM.getCurrentMapConfig();
+        updateWorldDimensions();
+
+        resetStageThoughtState();
+        resetCandlePuzzleState();
+        stage02BossIntroPlayed = false;
+        stage02BossActivated = false;
+        activeCutscene = CUTSCENE_NONE;
+
+        int currentLife = player.life;
+        player.setDefaultValues();
+        player.life = devSettings.isUnlimitedHealthEnabled()
+                ? player.maxLife
+                : Math.max(1, Math.min(currentLife, player.maxLife));
+        player.setSpawnForMap(currentMapPath);
+        snapCameraToPlayer();
+        assetSetter.setObject(currentMapPath);
+        assetSetter.setMonster(currentMapPath);
+        gameState = playState;
+    }
+
+    public String getCurrentMapPath() {
+        return currentMapPath;
+    }
+
+    public int getCameraStageX() {
+        return Math.round(cameraStageX);
+    }
+
+    public int getCameraStageY() {
+        return Math.round(cameraStageY);
+    }
+
+    public Point stageToScreenPoint(int stageX, int stageY) {
+        double screenX = stageX - getCameraStageX() + player.screenX;
+        double screenY = stageY - getCameraStageY() + player.screenY;
+        screenX = (screenX - screenWidth / 2.0) * cameraZoom + screenWidth / 2.0;
+        screenY = (screenY - screenHeight / 2.0) * cameraZoom + screenHeight / 2.0;
+        return new Point((int) Math.round(screenX), (int) Math.round(screenY));
+    }
+
+    public boolean isPathTileBlocked(int col, int row) {
+        if (col < 0 || row < 0 || col >= maxStageCol || row >= maxStageRow) {
+            return true;
+        }
+
+        int tileNum = tileM.mapTileNum[col][row];
+        if (tileM.tile[tileNum] == null || tileM.tile[tileNum].collision) {
+            return true;
+        }
+
+        Rectangle tileArea = new Rectangle(col * tileSize, row * tileSize, tileSize, tileSize);
+        for (SuperObject object : obj) {
+            if (object == null || !object.collision) {
+                continue;
+            }
+
+            Rectangle objectArea = new Rectangle(
+                    object.stageX + object.solidArea.x,
+                    object.stageY + object.solidArea.y,
+                    object.solidArea.width,
+                    object.solidArea.height);
+            if (tileArea.intersects(objectArea)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void startStage1DoorRevealCutscene() {
+        if (stage01DoorRevealPlayed || !"/maps/stage01.txt".equals(currentMapPath)) {
+            return;
+        }
+
+        SuperObject door = findObjectByName("DoorStage1");
+        if (door == null) {
+            return;
+        }
+
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+        cutsceneTargetStageX = door.stageX;
+        cutsceneTargetStageY = door.stageY + (tileSize / 2f);
+        cutsceneHoldTicks = CUTSCENE_HOLD_TICKS;
+        activeCutscene = CUTSCENE_STAGE1_LIGHTS_TO_DOOR;
+        cutscenePhase = CUTSCENE_PHASE_PAN_TO_TARGET;
+        stage01DoorRevealPlayed = true;
+        gameState = cutsceneState;
+    }
+
+    public void triggerStage2BossIntroFromBreakable() {
+        if (stage02BossIntroPlayed || !"/maps/stage02.txt".equals(currentMapPath)) {
+            return;
+        }
+        startStage2BossIntroCutscene();
+    }
+
+    private void startStage2BossIntroCutscene() {
+        Entity boss = findStage2Boss();
+        if (boss == null) {
+            stage02BossIntroPlayed = true;
+            return;
+        }
+
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+        cutsceneTargetStageX = boss.stageX;
+        cutsceneTargetStageY = boss.stageY;
+        cutsceneHoldTicks = CUTSCENE_HOLD_TICKS;
+        activeCutscene = CUTSCENE_STAGE2_BOSS_INTRO;
+        cutscenePhase = CUTSCENE_PHASE_PAN_TO_TARGET;
+        stage02BossIntroPlayed = true;
+        gameState = cutsceneState;
+    }
+
+    private void updateStage2BossIntroCutscene() {
+        if (cutscenePhase == CUTSCENE_PHASE_PAN_TO_TARGET) {
+            if (moveCameraToward(cutsceneTargetStageX, cutsceneTargetStageY, CAMERA_PAN_SPEED)) {
+                if (cutsceneHoldTicks > 0) {
+                    cutsceneHoldTicks--;
+                } else {
+                    ui.showMessage("Something stirs in the dark...");
+                    cutscenePhase = CUTSCENE_PHASE_WAIT_FOR_DIALOGUE;
+                }
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_PHASE_WAIT_FOR_DIALOGUE) {
+            if (!ui.isDialogueActive()) {
+                activateStage2Boss();
+                cutscenePhase = CUTSCENE_PHASE_RETURN_TO_PLAYER;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_PHASE_RETURN_TO_PLAYER) {
+            if (moveCameraToward(player.stageX, player.stageY, CAMERA_PAN_SPEED)) {
+                activeCutscene = CUTSCENE_NONE;
+                gameState = playState;
+            }
+        }
+    }
+
+    private Entity findStage2Boss() {
+        for (Entity entity : monster) {
+            if (entity instanceof MON_Stage2WitherBoss) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
+    private void activateStage2Boss() {
+        if (stage02BossActivated) {
+            return;
+        }
+
+        Entity boss = findStage2Boss();
+        if (boss instanceof MON_Stage2WitherBoss) {
+            ((MON_Stage2WitherBoss) boss).activate();
+            stage02BossActivated = true;
+        }
+    }
+
+    public void spawnStage2Minions(int sourceX, int sourceY, int count) {
+        for (int spawned = 0; spawned < count; spawned++) {
+            int slot = findFreeMonsterSlot();
+            if (slot == -1) {
+                return;
+            }
+
+            MON_MinionWitherSlime minion = new MON_MinionWitherSlime(this);
+            minion.stageX = sourceX + ((spawned % 3) - 1) * tileSize;
+            minion.stageY = sourceY + ((spawned / 3) + 1) * tileSize;
+            monster[slot] = minion;
+        }
+    }
+
+    private int findFreeMonsterSlot() {
+        for (int i = 0; i < monster.length; i++) {
+            if (monster[i] == null) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    public void applyStage2MinionHitEffect() {
+        minionEffectTicks = 180;
+        player.setControlsInvertedTicks(180);
+        vignette.setEnemyProximityLevel(1f);
+        vignette.setEnemyFlickerLevel(1f);
+    }
+
+    private void updateTemporaryEffects() {
+        if (minionEffectTicks > 0) {
+            minionEffectTicks--;
+        }
+    }
+
+    private SuperObject findObjectByName(String objectName) {
+        for (SuperObject object : obj) {
+            if (object != null && objectName.equals(object.name)) {
+                return object;
+            }
+        }
+        return null;
+    }
+
+    public void handleCandleInteraction(objects.OBJ_Candle candle) {
+        if (candlePuzzleSolved) {
+            ui.showMessage("The candles are already burning in the right order.");
+            return;
+        }
+
+        if (candle.isLit()) {
+            candle.turnOff();
+            litCandleOrder.remove(Integer.valueOf(candle.getCandleNumber()));
+            ui.showMessage("The candle goes out.");
+            return;
+        }
+
+        candle.setLit(true);
+        litCandleOrder.add(candle.getCandleNumber());
+
+        if (!areAllCandlesLit()) {
+            ui.showMessage("The candle catches flame.");
+            return;
+        }
+
+        if (isCandleSequenceCorrect()) {
+            candlePuzzleSolved = true;
+            ui.showMessage("The candles burn steadily.\n\nSomething clicked in the distance.");
+        } else {
+            turnOffAllCandles();
+            litCandleOrder.clear();
+            ui.showMessage("The wind grows stronger and turns off all the candles.\n\n"
+                    + "It must've been the wrong combination.\n\n"
+                    + "Let's try again.");
+        }
+    }
+
+    private void updateStageObjects() {
+        for (int i = 0; i < obj.length; i++) {
+            if (obj[i] instanceof NPC_JhonPorkJerkyJake) {
+                NPC_JhonPorkJerkyJake npc = (NPC_JhonPorkJerkyJake) obj[i];
+                npc.update();
+                if (npc.isFadedOut()) {
+                    obj[i] = null;
+                }
+            }
+        }
+    }
+
+    public boolean isCandlePuzzleSolved() {
+        return candlePuzzleSolved;
+    }
+
+    private void resetCandlePuzzleState() {
+        litCandleOrder.clear();
+        candlePuzzleSolved = false;
+        turnOffAllCandles();
+    }
+
+    private void turnOffAllCandles() {
+        for (SuperObject object : obj) {
+            if (object instanceof objects.OBJ_Candle) {
+                ((objects.OBJ_Candle) object).turnOff();
+            }
+        }
+    }
+
+    private boolean areAllCandlesLit() {
+        int candleCount = 0;
+        for (SuperObject object : obj) {
+            if (object instanceof objects.OBJ_Candle) {
+                candleCount++;
+                if (!((objects.OBJ_Candle) object).isLit()) {
+                    return false;
+                }
+            }
+        }
+        return candleCount > 0;
+    }
+
+    private boolean isCandleSequenceCorrect() {
+        if (litCandleOrder.size() != candleSequence.length) {
+            return false;
+        }
+        for (int i = 0; i < candleSequence.length; i++) {
+            if (litCandleOrder.get(i) != candleSequence[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public void run(){
@@ -491,8 +1039,9 @@ public class GamePanel extends JPanel implements Runnable{
         //Note: The order of rendering is so important, basically first rendered is the bottom most layer
         //followed by the next, this is how to create a layering system in the game.
 
-        if(gameState == titleState) {
+        if (shouldDrawTitleScreen()) {
             ui.draw(g2);
+            drawTransitionOverlay(g2);
             return;
         }
 
@@ -522,7 +1071,10 @@ public class GamePanel extends JPanel implements Runnable{
         vignette.draw(g2, player.screenX, player.screenY, tileSize, tileSize);
         ui.draw(g2);
 
-        // Fade overlay (draw last so it covers everything)
+        drawTransitionOverlay(g2);
+    }
+
+    private void drawTransitionOverlay(Graphics2D g2) {
         if (gameState == transitionState && fadeAlpha > 0f) {
             Composite old = g2.getComposite();
             g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
@@ -579,6 +1131,29 @@ public class GamePanel extends JPanel implements Runnable{
 
     public int getMasterVolumePercent() {
         return Math.round(masterVolume * 100);
+    }
+
+    public Point toGamePoint(int panelX, int panelY) {
+        double scale = Math.min((double) getWidth() / screenWidth, (double) getHeight() / screenHeight);
+        if (scale <= 0) {
+            return null;
+        }
+
+        int drawWidth = (int) Math.round(screenWidth * scale);
+        int drawHeight = (int) Math.round(screenHeight * scale);
+        int drawX = (getWidth() - drawWidth) / 2;
+        int drawY = (getHeight() - drawHeight) / 2;
+
+        if (panelX < drawX || panelX >= drawX + drawWidth || panelY < drawY || panelY >= drawY + drawHeight) {
+            return null;
+        }
+
+        int gameX = (int) ((panelX - drawX) / scale);
+        int gameY = (int) ((panelY - drawY) / scale);
+
+        gameX = Math.max(0, Math.min(screenWidth - 1, gameX));
+        gameY = Math.max(0, Math.min(screenHeight - 1, gameY));
+        return new Point(gameX, gameY);
     }
 
 }

@@ -2,26 +2,44 @@ package entity;
 
 import main.GamePanel;
 import main.KeyHandler;
+import main.monster.MON_MinionWitherSlime;
+import npc.NPC_JhonPorkJerkyJake;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.BufferedInputStream;
 import java.io.IOException;
 
 import main.Sound;
-import main.VignetteLight;
 
 public class Player extends Entity{
+    private static final float DEFAULT_WALK_SPEED = 2.5f;
+    private static final float SPRINT_SPEED_MULTIPLIER = 1.6f;
+    private static final float EXHAUSTED_SPEED = 1f;
+    private static final int MAX_STAMINA_TICKS = 200;
+    private static final int EXHAUSTED_TICKS = 180;
+    private static final int SPRINT_COOLDOWN_TICKS = 300;
+    private static final int STAMINA_REGEN_TICKS_PER_POINT = 2;
+    private static final int AXE_TABLE_COOLDOWN_TICKS = 120;
+    private static final int AXE_DOOR_COOLDOWN_TICKS = 600;
+
     GamePanel gp;
     KeyHandler keyH;
     Sound walkingSound;
     private int choice;
     private int interactCooldown = 0;
+    private int staminaTicks = MAX_STAMINA_TICKS;
+    private int exhaustedTicksRemaining = 0;
+    private int sprintCooldownTicksRemaining = 0;
+    private int staminaRegenCounter = 0;
+    private int controlsInvertedTicks = 0;
 
     public final int screenX;
     public final int screenY;
     public int hasKey = 0;
     public boolean hasReplacementSwitch = false;
+    public boolean hasAxe = false;
+    private int axeTableCooldownTicks = 0;
+    private int axeDoorCooldownTicks = 0;
 
 
     public Player(GamePanel gp, KeyHandler keyH, int choice){
@@ -50,8 +68,15 @@ public class Player extends Entity{
     }
 
     public void setDefaultValues(){
-        speed = 2.5f;
+        speed = gp != null ? gp.devSettings.getPlayerBaseSpeed() : DEFAULT_WALK_SPEED;
         direction = "down";
+        staminaTicks = MAX_STAMINA_TICKS;
+        exhaustedTicksRemaining = 0;
+        sprintCooldownTicksRemaining = 0;
+        staminaRegenCounter = 0;
+        hasAxe = false;
+        axeTableCooldownTicks = 0;
+        axeDoorCooldownTicks = 0;
 
         //PLAYER STATUS
         maxLife = 5;
@@ -201,32 +226,53 @@ public class Player extends Entity{
         if (interactCooldown > 0) {
             interactCooldown--;
         }
+        if (axeTableCooldownTicks > 0) {
+            axeTableCooldownTicks--;
+        }
+        if (axeDoorCooldownTicks > 0) {
+            axeDoorCooldownTicks--;
+        }
+        if (controlsInvertedTicks > 0) {
+            controlsInvertedTicks--;
+        }
 
         boolean moving = keyH.isUpPressed || keyH.isDownPressed || keyH.isLeftPressed || keyH.isRightPressed;
+        updateSprintState(moving);
 
         if(moving){
 
-            if(keyH.isUpPressed == true){
+            boolean upPressed = controlsInvertedTicks > 0 ? keyH.isDownPressed : keyH.isUpPressed;
+            boolean downPressed = controlsInvertedTicks > 0 ? keyH.isUpPressed : keyH.isDownPressed;
+            boolean leftPressed = controlsInvertedTicks > 0 ? keyH.isRightPressed : keyH.isLeftPressed;
+            boolean rightPressed = controlsInvertedTicks > 0 ? keyH.isLeftPressed : keyH.isRightPressed;
+
+            if(upPressed == true){
                 direction = "up";
-            } else if (keyH.isDownPressed == true) {
+            } else if (downPressed == true) {
                 direction = "down";
-            } else if (keyH.isLeftPressed == true) {
+            } else if (leftPressed == true) {
                 direction = "left";
-            } else if (keyH.isRightPressed == true) {
+            } else if (rightPressed == true) {
                 direction = "right";
             }
 
             // CHECK TILE COLLISION
             collisionOn = false;
-            gp.cChecker.checkTile(this);
+            if (!gp.devSettings.isPhaseThroughWallsEnabled()) {
+                gp.cChecker.checkTile(this);
+            }
 
             //CHECK OBJ COLLISION
-            int objIndex = gp.cChecker.checkObject(this, true);
-            pickUpObject(objIndex);
+            if (!gp.devSettings.isPhaseThroughWallsEnabled()) {
+                int objIndex = gp.cChecker.checkObject(this, true);
+                pickUpObject(objIndex);
+            }
 
             //CHECK MONSTER COLLISION
-            int monsterIndex = gp.cChecker.checkEntity(this, gp.monster);
-            contactMonster(monsterIndex);
+            if (!gp.devSettings.isPhaseThroughWallsEnabled()) {
+                int monsterIndex = gp.cChecker.checkEntity(this, gp.monster);
+                contactMonster(monsterIndex);
+            }
 
             // IF COLLISION IS FALSE, PLAYER CAN MOVE
             if(collisionOn == false) {
@@ -302,18 +348,18 @@ public class Player extends Entity{
                 case "Switch":
                     if (keyH.interactPressed && interactCooldown == 0) {              // E was pressed
                         if (gp.vignette.wereLightsActivated()) {
-                            gp.ui.showMessage("The switch is already on.\n\n"
-                                    + "We need it to stay on, so don't touch it!");
+                            gp.ui.showMessage(getSwitchAlreadyOnDialogue());
                         } else if (!hasReplacementSwitch) {
-                            gp.ui.showMessage("The switch seems to be broken...\n\n"
-                                    + "There should be something here that can fix it.");
+                            gp.ui.showMessage(getBrokenSwitchDialogue());
                         } else if (gp.vignette.turnLightsOn()) {
                             hasReplacementSwitch = false;
-                            gp.ui.showMessage("You replaced the broken switch.\n\n"
-                                    + "Lights are now on.");
+                            if (isStage("/maps/stage01.txt")) {
+                                gp.startStage1DoorRevealCutscene();
+                            } else {
+                                gp.ui.showMessage(getSwitchFixedDialogue());
+                            }
                         } else {
-                            gp.ui.showMessage("The switch is already on.\n\n"
-                                    + "We need it to stay on, so don't touch it!");
+                            gp.ui.showMessage(getSwitchAlreadyOnDialogue());
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -324,14 +370,13 @@ public class Player extends Entity{
                     gp.playSE(3);
                     hasKey++;
                     gp.obj[i]=null;
-                    gp.ui.showMessage("You got a key!\n\nKeys in bag: " + hasKey);
+                    gp.ui.showMessage(getLooseKeyDialogue());
 
                     break;
 
                 case "Empty_Table":
                     if (keyH.interactPressed && interactCooldown == 0) {
-                        gp.ui.showMessage("You searched the table.\n\n"
-                                + "Nothing useful here.");
+                        gp.ui.showMessage(getEmptyTableDialogue());
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -346,9 +391,7 @@ public class Player extends Entity{
                         gp.obj[i] = new objects.OBJ_Empty_Table();
                         gp.obj[i].stageX = tableX;
                         gp.obj[i].stageY = tableY;
-                        gp.ui.showMessage("You searched the table.\n\n"
-                                + "There's a key hidden underneath!\n\n"
-                                + "Keys in bag: " + hasKey);
+                        gp.ui.showMessage(getKeyTableDialogue());
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -359,10 +402,10 @@ public class Player extends Entity{
                         if(hasKey > 0) {
                             gp.playSE(3);
                             hasKey--;
-                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!");
+                            gp.ui.showMessage(getDoorOpenedDialogue());
                             gp.startMapTransition("/maps/stage02.txt");
                         } else {
-                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                            gp.ui.showMessage(getLockedDoorDialogue());
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -371,13 +414,23 @@ public class Player extends Entity{
 
                 case "DoorStage2":
                     if (keyH.interactPressed && interactCooldown == 0) {
-                        if(hasKey > 0) {
+                        objects.OBJ_DoorStage2 door = (objects.OBJ_DoorStage2) gp.obj[i];
+                        if (door.isOpenable()) {
                             gp.playSE(3);
-                            hasKey--;
-                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!\n\nEntering a different sized map...");
+                            gp.ui.showMessage(getDoorOpenedDialogue());
                             gp.startMapTransition("/maps/stage03.txt");
+                        } else if (!hasAxe) {
+                            gp.ui.showMessage("The door is barred shut.\n\nI need something strong enough to break the planks.");
+                        } else if (axeDoorCooldownTicks > 0) {
+                            gp.ui.showMessage("I need to catch my breath before swinging the axe again.");
                         } else {
-                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                            door.hitWithAxe();
+                            axeDoorCooldownTicks = AXE_DOOR_COOLDOWN_TICKS;
+                            if (door.isOpenable()) {
+                                gp.ui.showMessage("The last plank breaks loose.\n\nThe door can open now.");
+                            } else {
+                                gp.ui.showMessage("You strike the planks with the axe.\n\nMore of the door is exposed.");
+                            }
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -389,10 +442,10 @@ public class Player extends Entity{
                         if(hasKey > 0) {
                             gp.playSE(3);
                             hasKey--;
-                            gp.ui.showMessage("You used 1 key.\n\nThe door opened!\n\nEntering a different sized map...");
+                            gp.ui.showMessage(getDoorOpenedDialogue());
                             gp.startMapTransition("/maps/stage03.txt");
                         } else {
-                            gp.ui.showMessage("The door is locked.\n\nYou need a key.");
+                            gp.ui.showMessage(getLockedDoorDialogue());
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -401,28 +454,7 @@ public class Player extends Entity{
 
                 case "TablePaper":
                     if(keyH.interactPressed && interactCooldown == 0){
-                        gp.ui.showMessage("Name: Jhon Pork Tocino\n\n"
-                        + "Hmmm...... *turns the page\n\n"
-                        + "Scribles* Scribles* \n\n"
-                        + "This is getting creepy...\n\n"
-                        + "*turns the page\n\n"
-                        + "Ooh something is written at the back part\n\n"
-                        + "\"Idk if someone will eventually read this...\"\n\n" + "I am JPT,,, a student just like you\n\n"
-                        + "\"This place... isnt what u think it is...\n\n"
-                        + "\"I've been studying endlessly just like you, with no sleep at all\"\n\n"
-                        + "\"and then I got to class,, fell asleep,, and when I woke up,, I became trapped here\"\n\n"
-                        + "\"I've been wandering around and...\"\n\n" + "\"there's a few things you should now\"\n\n"
-                        + "\"1. there are shadowy creatures here that wander around, avoid them\"\n\n"
-                        + "\"2. you should check the tables with drawers for items\"\n\n" + "\"you should be able to find some eventually...\"\n\n" + " I hope\"\n\n"
-                        + "\"and lastly... I left some couple of pages here and there to maybe help you\"\n\n"
-                        + "\"...\"\n\n"
-                        + "\"You should read them\"\n\n"
-                        + "\"...\"\n\n"
-                        + "\"Anyways, I was trying to fix the switch here but I forgot where my bag was..\"\n\n so maybe find that first---\n\n"
-                        + "\"The lights...\"\n\n\"they're...\"\n\n\"they're...\"\n\n\"here...\"\n\n"
-                        + "\"Remember...\"\n\n\"AVOID THEM!!!!!\"\n\n"
-                        + "The rest of the page was ripped off with some red paint splots over it...\n\n"
-                        + "... I wonder what happened...");
+                        gp.ui.showMessage(getTablePaperDialogue());
 
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -433,8 +465,74 @@ public class Player extends Entity{
                     if (keyH.interactPressed && interactCooldown == 0) {
                         hasReplacementSwitch = true;
                         gp.obj[i] = null;
-                        gp.ui.showMessage("You searched the bag.\n\n"
-                                + "Inside is a spare switch that might fix the lights.");
+                        gp.ui.showMessage(getBagDialogue());
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "Axe":
+                    gp.playSE(3);
+                    hasAxe = true;
+                    gp.obj[i] = null;
+                    gp.ui.showMessage("You picked up an axe.\n\nThis can break damaged tables and wooden planks.");
+                    break;
+
+                case "BreakableTable":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        if (!hasAxe) {
+                            gp.ui.showMessage("This table is cracked, but I cannot break it by hand.");
+                        } else if (axeTableCooldownTicks > 0) {
+                            gp.ui.showMessage("I need a moment before swinging the axe again.");
+                        } else {
+                            gp.playSE(3);
+                            int breakableRow = gp.obj[i].stageY / gp.tileSize;
+                            gp.obj[i] = null;
+                            axeTableCooldownTicks = AXE_TABLE_COOLDOWN_TICKS;
+                            gp.ui.showMessage("You break the table apart with the axe.");
+                            if (isStage("/maps/stage02.txt") && breakableRow == 16) {
+                                gp.triggerStage2BossIntroFromBreakable();
+                            }
+                        }
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "HealthBag":
+                    if (life < maxLife) {
+                        gp.playSE(3);
+                        life = maxLife;
+                        gp.obj[i] = null;
+                        gp.ui.showMessage("You used the health bag.\n\nHealth restored.");
+                    } else if (keyH.interactPressed && interactCooldown == 0) {
+                        gp.ui.showMessage("There is medicine inside.\n\nI should save it until I need it.");
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "Candle":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        gp.handleCandleInteraction((objects.OBJ_Candle) gp.obj[i]);
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
+                case "JhonPorkJerkyJake":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        NPC_JhonPorkJerkyJake npc = (NPC_JhonPorkJerkyJake) gp.obj[i];
+                        if (gp.isCandlePuzzleSolved()) {
+                            gp.ui.showMessage("Jhon Pork Tocino: Thank you...\n\n"
+                                    + "The light is back.\n\n"
+                                    + "Jerky Jake and I can finally move on.");
+                            npc.startFade();
+                        } else {
+                            gp.ui.showMessage("Jhon Pork Tocino: Please, help us bring the light back.\n\n"
+                                    + "Jerky Jake is trapped with me, and the phantoms are getting closer.\n\n"
+                                    + "Find the candle puzzle and light it correctly.");
+                        }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -444,9 +542,156 @@ public class Player extends Entity{
         }
     }
 
+    private String getStagePath() {
+        return gp.getCurrentMapPath();
+    }
+
+    private boolean isStage(String mapPath) {
+        return mapPath.equals(getStagePath());
+    }
+
+    private String getSwitchAlreadyOnDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "The repaired switch is humming steadily.\n\nLeave it alone. This room needs every bit of light.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "The switch is already holding the lights together.\n\nDo not touch it again.";
+        }
+        return "The switch is already on.\n\nWe need it to stay on, so don't touch it!";
+    }
+
+    private String getBrokenSwitchDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "The switch panel is cracked open.\n\nSomething is missing from inside it.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "The switch is dead.\n\nIt needs a replacement part before it can work.";
+        }
+        return "The switch seems to be broken...\n\nThere should be something here that can fix it.";
+    }
+
+    private String getSwitchFixedDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You fit the spare switch into place.\n\nThe lights struggle, then turn on.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "The replacement switch clicks in.\n\nThe room lights wake up.";
+        }
+        return "You replaced the broken switch.\n\nLights are now on.";
+    }
+
+    private String getLooseKeyDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You found a key.\n\nKeys in bag: " + hasKey;
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "Another key...\n\nKeys in bag: " + hasKey;
+        }
+        return "You got a key!\n\nKeys in bag: " + hasKey;
+    }
+
+    private String getEmptyTableDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You searched the table.\n\nOnly dust and torn notes.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "You checked the table carefully.\n\nNothing but scratches.";
+        }
+        return "You searched the table.\n\nNothing useful here.";
+    }
+
+    private String getKeyTableDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You searched the drawer.\n\nA key was hidden under loose papers.\n\nKeys in bag: " + hasKey;
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "You searched beneath the table.\n\nA cold key was taped underneath.\n\nKeys in bag: " + hasKey;
+        }
+        return "You searched the table.\n\nThere's a key hidden underneath!\n\nKeys in bag: " + hasKey;
+    }
+
+    private String getDoorOpenedDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You used 1 key.\n\nThe next door unlocked.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "You used 1 key.\n\nThe door gives way.";
+        }
+        return "You used 1 key.\n\nThe door opened!";
+    }
+
+    private String getLockedDoorDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "The door will not move.\n\nThere has to be a key somewhere in this room.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "Locked again.\n\nFind the key before this place finds you.";
+        }
+        return "The door is locked.\n\nYou need a key.";
+    }
+
+    private String getTablePaperDialogue() {
+        if(isStage("/maps/stage01.txt")){
+            return "Name: Jhon Pork Tocino\n\n"
+                    + "Hmmm...... *turns the page\n\n"
+                    + "Scribles* Scribles* \n\n"
+                    + "This is getting creepy...\n\n"
+                    + "*turns the page\n\n"
+                    + "Ooh something is written at the back part\n\n"
+                    + "\"Idk if someone will eventually read this...\"\n\n" + "I am JPT,,, a student just like you\n\n"
+                    + "\"This place... isnt what u think it is...\n\n"
+                    + "\"I've been studying endlessly just like you, with no sleep at all\"\n\n"
+                    + "\"and then I got to class,, fell asleep,, and when I woke up,, I became trapped here\"\n\n"
+                    + "\"I've been wandering around and...\"\n\n" + "\"there's a few things you should now\"\n\n"
+                    + "\"1. there are shadowy creatures here that wander around, avoid them\"\n\n"
+                    + "\"2. you should check the tables with drawers for items\"\n\n" + "\"you should be able to find some eventually...\"\n\n" + " I hope\"\n\n"
+                    + "\"and lastly... I left some couple of pages here and there to maybe help you\"\n\n"
+                    + "\"...\"\n\n"
+                    + "\"You should read them\"\n\n"
+                    + "\"...\"\n\n"
+                    + "\"Anyways, I was trying to fix the switch here but I forgot where my bag was..\"\n\n so maybe find that first---\n\n"
+                    + "\"The lights...\"\n\n\"they're...\"\n\n\"they're...\"\n\n\"here...\"\n\n"
+                    + "\"Remember...\"\n\n\"AVOID THEM!!!!!\"\n\n"
+                    + "The rest of the page was ripped off with some red paint splots over it...\n\n"
+                    + "... I wonder what happened...";
+        }
+
+        if (isStage("/maps/stage02.txt")) {
+            return "insert text here kyle";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "The page is almost unreadable.\n\n"
+                    + "One line remains clear:\n\n"
+                    + "\"If the lights fail, run before the whispers get close.\"";
+        }
+        return "bye muna world";
+    }
+
+    private String getBagDialogue() {
+        if (isStage("/maps/stage02.txt")) {
+            return "You searched the bag.\n\nThere is another spare switch inside.";
+        }
+        if (isStage("/maps/stage03.txt")) {
+            return "You opened the bag.\n\nA switch part is wrapped in old cloth.";
+        }
+        return "You searched the bag.\n\nInside is a spare switch that might fix the lights.";
+    }
+
     public void contactMonster(int i){
         if(i != 999){
+            if (gp.monster[i] instanceof MON_MinionWitherSlime) {
+                ((MON_MinionWitherSlime) gp.monster[i]).hitPlayer();
+                return;
+            }
+            if (gp.monster[i] != null && gp.monster[i].type != 1) {
+                return;
+            }
+            if (gp.devSettings.isUnlimitedHealthEnabled()) {
+                life = maxLife;
+                return;
+            }
             if(invincible == false) {
+                gp.playSE(7);
                 life -= 1;
                 invincible = true;
             }
@@ -457,9 +702,109 @@ public class Player extends Entity{
         walkingSound.setVolume(volume);
     }
 
+    private void updateSprintState(boolean moving) {
+        float baseWalkSpeed = gp.devSettings.getPlayerBaseSpeed();
+        float sprintSpeed = baseWalkSpeed * SPRINT_SPEED_MULTIPLIER;
+
+        if (exhaustedTicksRemaining > 0) {
+            exhaustedTicksRemaining--;
+            speed = EXHAUSTED_SPEED;
+            return;
+        }
+
+        if (sprintCooldownTicksRemaining > 0) {
+            sprintCooldownTicksRemaining--;
+            speed = baseWalkSpeed;
+            if (sprintCooldownTicksRemaining == 0) {
+                staminaTicks = MAX_STAMINA_TICKS;
+                staminaRegenCounter = 0;
+            }
+            return;
+        }
+
+        boolean canSprint = moving && keyH.sprintPressed && staminaTicks > 0;
+        if (canSprint) {
+            speed = sprintSpeed;
+            staminaTicks--;
+            staminaRegenCounter = 0;
+
+            if (staminaTicks <= 0) {
+                staminaTicks = 0;
+                exhaustedTicksRemaining = EXHAUSTED_TICKS;
+                sprintCooldownTicksRemaining = SPRINT_COOLDOWN_TICKS;
+                speed = EXHAUSTED_SPEED;
+            }
+            return;
+        }
+
+        speed = baseWalkSpeed;
+        if (staminaTicks < MAX_STAMINA_TICKS) {
+            staminaRegenCounter++;
+            if (staminaRegenCounter >= STAMINA_REGEN_TICKS_PER_POINT) {
+                staminaTicks++;
+                staminaRegenCounter = 0;
+            }
+        } else {
+            staminaRegenCounter = 0;
+        }
+    }
+
+    public float getStaminaPercent() {
+        return (float) staminaTicks / MAX_STAMINA_TICKS;
+    }
+
+    public boolean isExhausted() {
+        return exhaustedTicksRemaining > 0;
+    }
+
+    public boolean isSprintOnCooldown() {
+        return sprintCooldownTicksRemaining > 0;
+    }
+
+    public int getCooldownSecondsRemaining() {
+        return (int) Math.ceil(sprintCooldownTicksRemaining / 60.0);
+    }
+
+    public boolean hasAxeCooldownActive() {
+        return axeTableCooldownTicks > 0 || axeDoorCooldownTicks > 0;
+    }
+
+    public int getAxeTableCooldownSecondsRemaining() {
+        return (int) Math.ceil(axeTableCooldownTicks / 60.0);
+    }
+
+    public int getAxeDoorCooldownSecondsRemaining() {
+        return (int) Math.ceil(axeDoorCooldownTicks / 60.0);
+    }
+
+    public int getActiveAxeCooldownSecondsRemaining() {
+        return Math.max(getAxeDoorCooldownSecondsRemaining(), getAxeTableCooldownSecondsRemaining());
+    }
+
+    public float getAxeCooldownReadyPercent() {
+        if (axeDoorCooldownTicks > 0) {
+            return 1f - ((float) axeDoorCooldownTicks / AXE_DOOR_COOLDOWN_TICKS);
+        }
+        if (axeTableCooldownTicks > 0) {
+            return 1f - ((float) axeTableCooldownTicks / AXE_TABLE_COOLDOWN_TICKS);
+        }
+        return 1f;
+    }
+
+    public boolean isAxeDoorCooldownActive() {
+        return axeDoorCooldownTicks > 0;
+    }
+
+    public void setControlsInvertedTicks(int ticks) {
+        controlsInvertedTicks = Math.max(controlsInvertedTicks, ticks);
+    }
+
     public void draw(Graphics2D g2) {
 //        g2.setColor(Color.RED);
 //        g2.fillOval(x, y, gp.tileSize, gp.tileSize);
+
+        int drawX = stageX - gp.getCameraStageX() + screenX;
+        int drawY = stageY - gp.getCameraStageY() + screenY;
 
         BufferedImage image = null;
 
@@ -524,30 +869,34 @@ public class Player extends Entity{
                 }
                 break;
         }
+
+        // Flickering effect during invincibility - must be set BEFORE drawing
+        if(invincible == true) {
+            // Flicker every 5 frames (creates a visible blinking effect)
+            if(invincibleCounter % 10 < 5) {
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
+            }
+        }
+
         switch(choice) {
             case 1:
-                g2.drawImage(image, screenX, screenY, 25 * 2, 40 * 2, null);
+                g2.drawImage(image, drawX, drawY, 25 * 2, 40 * 2, null);
             break;
 
             case 2:
-                g2.drawImage(image, screenX, screenY, 29*2, 32*2, null);
+                g2.drawImage(image, drawX, drawY, 29*2, 32*2, null);
             break;
 
             case 3:
-                g2.drawImage(image, screenX, screenY, 25*2, 41*2, null);
+                g2.drawImage(image, drawX, drawY, 25*2, 41*2, null);
             break;
 
             case 4:
-                g2.drawImage(image, screenX, screenY, 31*2, 37*2, null);
+                g2.drawImage(image, drawX, drawY, 31*2, 37*2, null);
             break;
             default:
                 break;
         }
-
-        if(invincible == true) {
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.3f));
-        }
-
 
         //reset alpha
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 1f));

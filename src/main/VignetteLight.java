@@ -14,11 +14,13 @@ public class VignetteLight {
     // - flickerAmount, flickerChance, and flickerDuration control the character light flicker.
     private int lightRadius = 75;
     private float darkness = 0.9f;
-    private float brokenRoomLightDarkness = 0.25f;
+    private float brokenRoomLightDarkness = 0.4f;
+    private float roomLightEnemyDarkness = 0.8f;
     private final Color darkColor = new Color(0, 0, 0);
     private Color glowColor = new Color(255, 200, 100, 80);
 
     private boolean roomLight = false;
+    private boolean devRoomLightsOn = false;
     private boolean lightsActivated = false;
     private boolean flickerEnabled = true;
     private int currentRadius;
@@ -29,6 +31,12 @@ public class VignetteLight {
     private int flickerAmount = 14;
     private int flickerChance = 3;
     private int flickerDuration = 6;
+    private float enemyFlickerTarget = 0f;
+    private float enemyFlickerProgress = 0f;
+    private float enemyFlickerSmoothing = 0.08f;
+    private int enemyFlickerAmountBonus = 28;
+    private int enemyFlickerChanceBonus = 32;
+    private int enemyFlickerDurationBonus = 5;
 
     private float enemyDimTarget = 0f;
     private float enemyDimSmoothing = 0.045f;
@@ -50,7 +58,7 @@ public class VignetteLight {
     public void update() {
         updateEnemyProximityDimming();
 
-        if (roomLight && enemyDimTarget <= 0f && enemyDimProgress <= 0.001f) {
+        if (isRoomLightVisible() && enemyDimTarget <= 0f && enemyDimProgress <= 0.001f) {
             currentRadius = 0;
             return;
         }
@@ -70,10 +78,15 @@ public class VignetteLight {
         og.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC));
 
-        float currentDarkness = roomLight ? brokenRoomLightDarkness : darkness;
+        boolean roomLightVisible = isRoomLightVisible();
+        float currentDarkness = roomLightVisible ? brokenRoomLightDarkness : darkness;
         float easedEnemyDim = smoothStep(enemyDimProgress);
         if (easedEnemyDim > 0f) {
-            currentDarkness = Math.min(1f, currentDarkness + easedEnemyDim * enemyDimAmount);
+            if (roomLightVisible) {
+                currentDarkness = lerp(brokenRoomLightDarkness, roomLightEnemyDarkness, easedEnemyDim);
+            } else {
+                currentDarkness = Math.min(1f, currentDarkness + easedEnemyDim * enemyDimAmount);
+            }
         }
 
         og.setColor(new Color(
@@ -83,12 +96,18 @@ public class VignetteLight {
                 Math.round(currentDarkness * 255)));
         og.fillRect(0, 0, screenW, screenH);
 
-        if ((!roomLight || enemyDimProgress > 0f) && currentRadius > 0) {
-            og.setComposite(AlphaComposite.getInstance(AlphaComposite.DST_OUT));
-            drawLightCircle(og, cx, cy, currentRadius);
+        int radiusToDraw = currentRadius;
+        if ((!roomLightVisible || easedEnemyDim > 0f) && radiusToDraw > 1) {
+            Composite lightComposite = og.getComposite();
+            float lightAlpha = roomLightVisible ? easedEnemyDim : 1f;
 
-            og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER));
-            drawGlowRing(og, cx, cy, currentRadius);
+            og.setComposite(AlphaComposite.getInstance(AlphaComposite.DST_OUT, lightAlpha));
+            drawLightCircle(og, cx, cy, radiusToDraw);
+
+            og.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, lightAlpha));
+            drawGlowRing(og, cx, cy, radiusToDraw);
+
+            og.setComposite(lightComposite);
         }
 
         og.dispose();
@@ -114,7 +133,15 @@ public class VignetteLight {
     }
 
     public boolean areRoomLightsOn() {
-        return roomLight;
+        return isRoomLightVisible();
+    }
+
+    public void setDevRoomLightsOn(boolean devRoomLightsOn) {
+        this.devRoomLightsOn = devRoomLightsOn;
+    }
+
+    private boolean isRoomLightVisible() {
+        return roomLight || devRoomLightsOn;
     }
 
     public boolean wereLightsActivated() {
@@ -144,6 +171,10 @@ public class VignetteLight {
 
     public void setBrokenRoomLightDarkness(float darkness) {
         this.brokenRoomLightDarkness = Math.max(0f, Math.min(1f, darkness));
+    }
+
+    public void setRoomLightEnemyDarkness(float darkness) {
+        this.roomLightEnemyDarkness = Math.max(0f, Math.min(1f, darkness));
     }
 
     public void setGlowColor(Color c) {
@@ -180,11 +211,20 @@ public class VignetteLight {
         if (Math.abs(enemyDimTarget - enemyDimProgress) < 0.001f) {
             enemyDimProgress = enemyDimTarget;
         }
+
+        enemyFlickerProgress += (enemyFlickerTarget - enemyFlickerProgress) * enemyFlickerSmoothing;
+        if (Math.abs(enemyFlickerTarget - enemyFlickerProgress) < 0.001f) {
+            enemyFlickerProgress = enemyFlickerTarget;
+        }
     }
 
     private float smoothStep(float value) {
         float clamped = Math.max(0f, Math.min(1f, value));
         return clamped * clamped * (3f - 2f * clamped);
+    }
+
+    private float lerp(float start, float end, float amount) {
+        return start + (end - start) * amount;
     }
 
     private void updateFlicker() {
@@ -201,11 +241,19 @@ public class VignetteLight {
         }
 
         currentRadius = lightRadius;
-        if (flickerAmount > 0 && rand.nextInt(100) < flickerChance) {
+        int effectiveFlickerChance = Math.min(100, flickerChance + Math.round(enemyFlickerChanceBonus * enemyFlickerProgress));
+        int effectiveFlickerAmount = flickerAmount + Math.round(enemyFlickerAmountBonus * enemyFlickerProgress);
+        int effectiveFlickerDuration = flickerDuration + Math.round(enemyFlickerDurationBonus * enemyFlickerProgress);
+
+        if (effectiveFlickerAmount > 0 && rand.nextInt(100) < effectiveFlickerChance) {
             isFlickering = true;
-            flickerTimer = flickerDuration;
-            flickerOffset = rand.nextInt(flickerAmount * 2 + 1) - flickerAmount;
+            flickerTimer = effectiveFlickerDuration;
+            flickerOffset = rand.nextInt(effectiveFlickerAmount * 2 + 1) - effectiveFlickerAmount;
         }
+    }
+
+    public void setEnemyFlickerLevel(float level) {
+        this.enemyFlickerTarget = Math.max(0f, Math.min(1f, level));
     }
 
     private void drawLightCircle(Graphics2D g, int cx, int cy, int radius) {

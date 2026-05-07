@@ -8,6 +8,13 @@ import java.util.Random;
 public class MON_Dementor extends Entity {
 
     private int imageVariant;
+    private static final int DETECTION_RANGE = 3; // tiles (reduced from 5)
+    private static final float CHASE_SPEED = 1.5f;
+    private static final float WANDER_SPEED = 1f;
+    
+    private int originalX = -1;
+    private int originalY = -1;
+    private static final int WANDER_RADIUS = 3; // tiles
 
     public MON_Dementor(GamePanel gp, int imageVariant) {
         super(gp);
@@ -15,15 +22,15 @@ public class MON_Dementor extends Entity {
         this.imageVariant = imageVariant;
         type = 1;
         name = "Dementor";
-        speed = 1;
+        speed = WANDER_SPEED;
         maxLife = 4;
         life = maxLife;
         direction = "down";
 
-        solidArea.x = 8;
-        solidArea.y = 45;
-        solidArea.width = 28;
-        solidArea.height = 32;
+        solidArea.x = 12;
+        solidArea.y = 24;
+        solidArea.width = 24;
+        solidArea.height = 24;
         solidAreaDefaultX = solidArea.x;
         solidAreaDefaultY = solidArea.y;
 
@@ -90,26 +97,90 @@ public class MON_Dementor extends Entity {
     }
 
     public void setAction() {
-        actionLockCounter ++;
+        if (originalX == -1 && originalY == -1) {
+            originalX = stageX;
+            originalY = stageY;
+        }
 
-        if(actionLockCounter == 120) {
-            Random random = new Random();
-            int i = random.nextInt(100) + 1;
+        // Check if player is nearby
+        int playerX = gp.player.stageX;
+        int playerY = gp.player.stageY;
 
-            if(i <= 25) {
-                direction = "up";
-            }
-            if(i > 25 && i <= 50) {
-                direction = "down";
-            }
-            if(i > 50 && i <= 75) {
-                direction = "left";
-            }
-            if(i > 75 && i < 100) {
-                direction = "right";
-            }
+        int distanceX = Math.abs(stageX - playerX);
+        int distanceY = Math.abs(stageY - playerY);
+        int tileDistance = (distanceX + distanceY) / gp.tileSize;
 
-            actionLockCounter = 0;
+        if (tileDistance <= DETECTION_RANGE) {
+            // Player detected - chase mode
+            speed = CHASE_SPEED;
+
+            // Determine direction to chase player
+            int deltaX = playerX - stageX;
+            int deltaY = playerY - stageY;
+
+            // Prioritize the axis with greater distance
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                if (deltaX > 0) {
+                    direction = "right";
+                } else {
+                    direction = "left";
+                }
+            } else {
+                if (deltaY > 0) {
+                    direction = "down";
+                } else {
+                    direction = "up";
+                }
+            }
+        } else {
+            // Player not detected
+            speed = WANDER_SPEED;
+
+            int distToOriginalX = Math.abs(stageX - originalX);
+            int distToOriginalY = Math.abs(stageY - originalY);
+            int tileDistToOriginal = (distToOriginalX + distToOriginalY) / gp.tileSize;
+            
+            // If the monster too far from original spawn, walk back
+            if (tileDistToOriginal > WANDER_RADIUS) {
+                int deltaX = originalX - stageX;
+                int deltaY = originalY - stageY;
+                
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    if (deltaX > 0) {
+                        direction = "right";
+                    } else {
+                        direction = "left";
+                    }
+                } else {
+                    if (deltaY > 0) {
+                        direction = "down";
+                    } else {
+                        direction = "up";
+                    }
+                }
+            } else {
+                // if within wander radius of our spawn point, freely wander
+                actionLockCounter++;
+                if(actionLockCounter == 120) {
+                    Random random = new Random();
+                    int i = random.nextInt(100) + 1;
+
+                    if(i <= 25) {
+                        direction = "up";
+                    }
+                    if(i > 25 && i <= 50) {
+                        direction = "down";
+                    }
+                    if(i > 50 && i <= 75) {
+                        direction = "left";
+                    }
+                    if(i > 75 && i < 100) {
+                        direction = "right";
+                    }
+
+                    actionLockCounter = 0;
+                }
+            }
         }
     }
 }

@@ -25,17 +25,19 @@ public class OBJ_DoorStage1 extends objects.SuperObject {
 
     @Override
     public void draw(Graphics2D g2, GamePanel gp){
-        int screenX =  stageX - gp.player.stageX + gp.player.screenX;
-        int screenY = stageY - gp.player.stageY + gp.player.screenY;
+        int cameraStageX = gp.getCameraStageX();
+        int cameraStageY = gp.getCameraStageY();
+        int screenX =  stageX - cameraStageX + gp.player.screenX;
+        int screenY = stageY - cameraStageY + gp.player.screenY;
 
         // Door sprite is meant to be 2 tiles tall.
         int drawW = gp.tileSize;
         int drawH = gp.tileSize * 2;
 
-        if(stageX + drawW > gp.player.stageX - gp.player.screenX &&
-                stageX - drawW < gp.player.stageX + gp.player.screenX &&
-                stageY + drawH > gp.player.stageY - gp.player.screenY &&
-                stageY - drawH < gp.player.stageY + gp.player.screenY) {
+        if(stageX + drawW > cameraStageX - gp.player.screenX &&
+                stageX - drawW < cameraStageX + gp.player.screenX &&
+                stageY + drawH > cameraStageY - gp.player.screenY &&
+                stageY - drawH < cameraStageY + gp.player.screenY) {
 
             g2.drawImage(image, screenX, screenY, drawW, drawH, null);
         }
