@@ -247,6 +247,10 @@ public class Entity {
         return findPathDirectionToStagePoint(targetStageX, targetStageY, false);
     }
 
+    public String getPathDirectionToStagePoint(int targetStageX, int targetStageY) {
+        return findPathDirectionToStagePoint(targetStageX, targetStageY);
+    }
+
     private String findPathDirectionToStagePoint(int targetStageX, int targetStageY, boolean avoidRecentlyBlockedDirection) {
         int startCol = getCenterStageX() / gp.tileSize;
         int startRow = getCenterStageY() / gp.tileSize;

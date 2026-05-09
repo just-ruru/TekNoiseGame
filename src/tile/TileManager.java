@@ -139,7 +139,12 @@ public class TileManager {
                 String[] numbers = line.trim().split("\\s+"); // Handles multiple spaces/tabs
 
                 while (col < currentMapConfig.maxStageCol) {
-                    int num = parseMapToken(numbers[col], col, row);
+                    String token = col < numbers.length ? numbers[col] : "0";
+                    if (col >= numbers.length) {
+                        System.out.println("Warning: missing tile token at [" + col + "][" + row + "], padded with floor.");
+                    }
+
+                    int num = parseMapToken(token, col, row);
 
                     if (num >= 0 && num < tile.length) { // Bounds check against tile[]
                         mapTileNum[col][row] = num;
@@ -164,15 +169,20 @@ public class TileManager {
     }
 
     private int parseMapToken(String token, int col, int row) {
-        if ("A".equalsIgnoreCase(token) ||
-                "C".equalsIgnoreCase(token) ||
-                "D".equalsIgnoreCase(token) ||
-                "H".equalsIgnoreCase(token) ||
-                "J".equalsIgnoreCase(token) ||
-                "N".equalsIgnoreCase(token) ||
-                "S".equalsIgnoreCase(token) ||
-                "X".equalsIgnoreCase(token)) {
-            return 0;
+        switch (token.toUpperCase()) {
+            case "A":
+            case "C":
+            case "D":
+            case "E":
+            case "H":
+            case "J":
+            case "N":
+            case "S":
+            case "S2":
+            case "X":
+            case "XX":
+            case "Y":
+                return 0;
         }
 
         try {

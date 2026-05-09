@@ -2,7 +2,9 @@ package main;
 
 import entity.Entity;
 import entity.Player;
+import main.monster.MON_Dementor;
 import main.monster.MON_MinionWitherSlime;
+import main.monster.MON_Stage3BossMomo;
 import main.monster.MON_Stage2WitherBoss;
 import npc.NPC_JhonPorkJerkyJake;
 import objects.SuperObject;
@@ -14,6 +16,8 @@ import java.awt.image.BufferedImage;
 import java.util.*;
 
 import main.MapConfig;
+
+import main.IntroCutscenePlayer;
 
 public class GamePanel extends JPanel implements Runnable{
 
@@ -117,9 +121,19 @@ public class GamePanel extends JPanel implements Runnable{
     private static final int CUTSCENE_NONE = 0;
     private static final int CUTSCENE_STAGE1_LIGHTS_TO_DOOR = 1;
     private static final int CUTSCENE_STAGE2_BOSS_INTRO = 2;
+    private static final int CUTSCENE_STAGE3_ESCAPE = 3;
     private static final int CUTSCENE_PHASE_PAN_TO_TARGET = 0;
     private static final int CUTSCENE_PHASE_WAIT_FOR_DIALOGUE = 1;
     private static final int CUTSCENE_PHASE_RETURN_TO_PLAYER = 2;
+    private static final int CUTSCENE_STAGE3_MOVE_TO_CLUE = 3;
+    private static final int CUTSCENE_STAGE3_PLAYER_PANIC = 4;
+    private static final int CUTSCENE_STAGE3_GHOST_WARNING = 5;
+    private static final int CUTSCENE_STAGE3_RUN_TO_BARRIER = 6;
+    private static final int CUTSCENE_STAGE3_RUN_TO_SAFE_TILE = 7;
+    private static final int CUTSCENE_STAGE3_PAN_TO_BOSS = 8;
+    private static final int CUTSCENE_STAGE3_HOLD_ON_BOSS = 9;
+    private static final int CUTSCENE_STAGE3_RETURN_AND_START_CHASE = 10;
+    private static final int TITLE_START_BLACK_HOLD_TICKS = 30;
     private int activeCutscene = CUTSCENE_NONE;
     private int cutscenePhase = CUTSCENE_PHASE_PAN_TO_TARGET;
     private int cutsceneHoldTicks = 0;
@@ -129,10 +143,26 @@ public class GamePanel extends JPanel implements Runnable{
     private boolean stage02BossIntroPlayed = false;
     private boolean stage02BossActivated = false;
     private int minionEffectTicks = 0;
-    private final int[] candleSequence = {1, 4, 2, 3};
+    private final int[] candleSequence = {1, 2, 3, 4};
     private final java.util.List<Integer> litCandleOrder = new ArrayList<>();
     private boolean candlePuzzleSolved = false;
     private String pendingStartDialogue = null;
+    private boolean stage3ChaseStarted = false;
+    private boolean pendingReturnToTitleAfterDialogue = false;
+    private int cameraShakeTicks = 0;
+    private int cameraShakeMagnitude = 0;
+    private float cameraShakeOffsetX = 0f;
+    private float cameraShakeOffsetY = 0f;
+    private Point stage3ClueMarker;
+    private Point stage3ClueApproachTile;
+    private java.util.List<Point> stage3BreakMarkers = new ArrayList<>();
+    private Point stage3BreakApproachTile;
+    private java.util.List<Point> stage3SafeMarkers = new ArrayList<>();
+    private Point stage3SafeApproachTile;
+    private Point stage3BossMarker;
+    private int stage3MoveToClueTicks = 0;
+    private boolean stage3BarrierBroken = false;
+    private static final int STAGE3_BOSS_PAN_HOLD_TICKS = 360;
     private IntroCutscenePlayer introCutscenePlayer;
 
     /** Same order as the character selection UI: Lerler, Gasha, Nnyl, Gemal. */
@@ -202,15 +232,18 @@ public class GamePanel extends JPanel implements Runnable{
     private void registerThoughtTriggers() {
         // Test thought at the marked X area in stage01.
         registerTileThought("/maps/stage01.txt", 5, 13,
-                "I should look around...\n\n and find... a way out...");
+                "I need to stay calm.\n\nThere has to be a way out of this room.");
 
         registerTileThought("/maps/stage01.txt", 3, 7,
-                "Damn its very dark...\n\nA light switch can really be a big help right now");
+                "It's too dark to see properly.\n\nIf I can get the lights back on, maybe I can make sense of this place.");
+
+        registerTileThought("/maps/stage01.txt", 1, 2,
+                "There's a switch on the wall.\n\nIf I can get it working, I might finally see what's in this room.");
 
         registerTileThought("/maps/stage01.txt", 7, 2, "stage01_7_2_or_7_4",
-                "Hmmmm...\n\n" + "An orange booklet, maybe there's something inside that can tell us what's happening");
+                "An orange booklet...\n\nMaybe it explains what happened here.");
         registerTileThought("/maps/stage01.txt", 7, 4, "stage01_7_2_or_7_4",
-                "Hmmmm...\n\n" + "An orange booklet, maybe there's something inside that can tell us what's happening");
+                "An orange booklet...\n\nMaybe it explains what happened here.");
 
         //
         // Optional random thoughts for the same tile:
@@ -289,6 +322,11 @@ public class GamePanel extends JPanel implements Runnable{
         stage02BossIntroPlayed = false;
         stage02BossActivated = false;
         activeCutscene = CUTSCENE_NONE;
+        stage3ChaseStarted = false;
+        pendingReturnToTitleAfterDialogue = false;
+        clearStage3CutsceneMarkers();
+        stage3MoveToClueTicks = 0;
+        stage3BarrierBroken = false;
         disposeIntroCutscenePlayer();
         resetCandlePuzzleState();
         player.hasKey = 0;
@@ -306,8 +344,12 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void startGameThread(){
+        if (gameThread != null && gameThread.isAlive()) {
+            return;
+        }
         gameThread = new Thread(this);
         gameThread.start();
+        SwingUtilities.invokeLater(this::requestFocusInWindow);
     }
 
     public void startGameFromTitle() {
@@ -315,41 +357,42 @@ public class GamePanel extends JPanel implements Runnable{
             return;
         }
 
-        pendingStartDialogue = "woke up*\n\n"
-                + "what's happening... \n\n"
-                + "Its so dark...\n\n"
-                + "where is everybody...";
-        stopMusic();
-        disposeIntroCutscenePlayer();
-        introCutscenePlayer = new IntroCutscenePlayer(masterVolume);
-        if (!introCutscenePlayer.isAvailable()) {
-            finishIntroCutscene();
-            return;
-        }
-
-        introCutscenePlayer.start();
-        gameState = introCutsceneState;
+        prepareGameStart(choice);
+        beginTitleStartTransition();
     }
 
-    /**
-     * characterIndex: 0..3 in the order shown on the character selection screen
-     * (Lerler, Gasha, Nnyl, Gemal).
-     */
-    public void startGameFromCharacterSelection(int characterIndex) {
-        if (gameState != characterSelectState) {
+    public void startGameFromCharacterSelection(int buttonIndex) {
+        if (buttonIndex < 0 || buttonIndex >= CHARACTER_INTRO_CUTSCENE_IDS.length) {
             return;
         }
 
-        if (characterIndex < 0 || characterIndex >= 4) {
+        prepareGameStart(buttonIndex + 1);
+
+        introCutscenePlayer = new IntroCutscenePlayer(masterVolume, CHARACTER_INTRO_CUTSCENE_IDS[buttonIndex]);
+        if (introCutscenePlayer.isAvailable()) {
+            introCutscenePlayer.start();
+            gameState = introCutsceneState;
             return;
         }
 
-        // Map selection order to the Player choice values (1..4).
-        choice = characterIndex + 1;
+        disposeIntroCutscenePlayer();
+        beginTitleStartTransition();
+    }
 
-        // Prepare a fresh run state so the correct character/map setup is ready
-        // when we finish any cutscene/transition.
-        stopMusic();
+    private void prepareGameStart(int selectedChoice) {
+        choice = selectedChoice;
+        player = new Player(this, keyH, choice);
+        player.setWalkingVolume(masterVolume);
+        keyH.interactPressed = false;
+        keyH.sprintPressed = false;
+
+        currentMapPath = "/maps/stage01.txt";
+        nextMapPath = null;
+        fadeAlpha = 0f;
+        fadeOutPhase = true;
+        activeTransitionType = TRANSITION_NONE;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = 0;
         disposeIntroCutscenePlayer();
 
         resetStageThoughtState();
@@ -357,40 +400,41 @@ public class GamePanel extends JPanel implements Runnable{
         stage02BossIntroPlayed = false;
         stage02BossActivated = false;
         activeCutscene = CUTSCENE_NONE;
+        stage3ChaseStarted = false;
+        pendingReturnToTitleAfterDialogue = false;
+        clearStage3CutsceneMarkers();
+        stage3MoveToClueTicks = 0;
+        stage3BarrierBroken = false;
         resetCandlePuzzleState();
 
+        tileM.loadMap(currentMapPath);
+        currentMapConfig = tileM.getCurrentMapConfig();
+        updateWorldDimensions();
+
         player.hasKey = 0;
         player.hasReplacementSwitch = false;
         player.setDefaultValues();
         player.setSpawnForMap(currentMapPath);
-
-        // Re-create the player so the correct sprite frames load for the chosen character.
-        player = new Player(this, keyH, choice);
-        player.hasKey = 0;
-        player.hasReplacementSwitch = false;
-        player.setDefaultValues();
-        player.setSpawnForMap(currentMapPath);
-
         snapCameraToPlayer();
         assetSetter.setObject(currentMapPath);
         assetSetter.setMonster(currentMapPath);
-
         phantomVoice.setFile(6);
+        phantomVoiceVolume = 0f;
         applyPhantomVoiceVolume();
-        pendingStartDialogue = "woke up*\n\n"
-                + "what's happening... \n\n"
-                + "Its so dark...\n\n"
-                + "where is everybody...";
+        pendingStartDialogue = "...\n\n"
+                + "Where am I?\n\n"
+                + "Why is it so dark?\n\n"
+                + "Where did everyone go?";
+    }
 
-        String cutsceneId = CHARACTER_INTRO_CUTSCENE_IDS[characterIndex];
-        introCutscenePlayer = new IntroCutscenePlayer(masterVolume, cutsceneId);
-        if (!introCutscenePlayer.isAvailable()) {
-            finishIntroCutscene();
-            return;
-        }
-
-        introCutscenePlayer.start();
-        gameState = introCutsceneState;
+    private void beginTitleStartTransition() {
+        fadeAlpha = 1f;
+        fadeOutPhase = false;
+        activeTransitionType = TRANSITION_TITLE_START;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = TITLE_START_BLACK_HOLD_TICKS;
+        playMusic(1);
+        gameState = transitionState;
     }
 
     public void exitGame() {
@@ -435,7 +479,9 @@ public class GamePanel extends JPanel implements Runnable{
             //nothing
         }
         if (gameState == cutsceneState) {
+            updateTemporaryEffects();
             updateCutscene();
+            vignette.update();
         }
         if (gameState == introCutsceneState) {
             updateIntroCutscene();
@@ -449,6 +495,16 @@ public class GamePanel extends JPanel implements Runnable{
             keyH.interactPressed = false;
         }
         if (gameState != playState && gameState != cutsceneState && gameState != introCutsceneState) {
+            if (pendingReturnToTitleAfterDialogue && !ui.isDialogueActive()) {
+                pendingReturnToTitleAfterDialogue = false;
+                currentMapPath = "/maps/stage01.txt";
+                tileM.loadMap(currentMapPath);
+                currentMapConfig = tileM.getCurrentMapConfig();
+                updateWorldDimensions();
+                setupGame();
+            }
+        }
+        if (gameState != playState && gameState != cutsceneState) {
             checkEnemyProximityDimming();
             vignette.update();
         }
@@ -464,6 +520,15 @@ public class GamePanel extends JPanel implements Runnable{
         if (introCutscenePlayer.isFinished()) {
             finishIntroCutscene();
         }
+    }
+
+    public void skipIntroCutscene() {
+        if (gameState != introCutsceneState) {
+            return;
+        }
+
+        keyH.interactPressed = false;
+        finishIntroCutscene();
     }
 
     private void updateCameraFollowPlayer() {
@@ -500,6 +565,9 @@ public class GamePanel extends JPanel implements Runnable{
         if (activeCutscene == CUTSCENE_STAGE2_BOSS_INTRO) {
             updateStage2BossIntroCutscene();
         }
+        if (activeCutscene == CUTSCENE_STAGE3_ESCAPE) {
+            updateStage3EscapeCutscene();
+        }
     }
 
     private void updateCutsceneEntityAnimations() {
@@ -516,7 +584,9 @@ public class GamePanel extends JPanel implements Runnable{
                 if (cutsceneHoldTicks > 0) {
                     cutsceneHoldTicks--;
                 } else {
-                    ui.showMessage("ah so there's the door");
+                    ui.showMessage("So that's the way out...\n\n"
+                            + "But those things are still out there.\n\n"
+                            + "I need to be careful.");
                     cutscenePhase = CUTSCENE_PHASE_WAIT_FOR_DIALOGUE;
                 }
             }
@@ -696,7 +766,11 @@ public class GamePanel extends JPanel implements Runnable{
                 // Reset "once per stage" thought state after the map changes.
                 resetStageThoughtState();
                 int currentLife = player.life;
+                boolean hadAxe = player.hasAxe;
                 player.setDefaultValues();
+                if (hadAxe || "/maps/stage03.txt".equals(currentMapPath)) {
+                    player.hasAxe = true;
+                }
                 player.life = Math.min(currentLife, player.maxLife);
                 player.setSpawnForMap(currentMapPath);
                 snapCameraToPlayer();
@@ -705,6 +779,11 @@ public class GamePanel extends JPanel implements Runnable{
                 resetCandlePuzzleState();
                 stage02BossIntroPlayed = false;
                 stage02BossActivated = false;
+                stage3ChaseStarted = false;
+                pendingReturnToTitleAfterDialogue = false;
+                clearStage3CutsceneMarkers();
+                stage3MoveToClueTicks = 0;
+                stage3BarrierBroken = false;
                 assetSetter.setObject(currentMapPath);
                 assetSetter.setMonster(currentMapPath);
 
@@ -797,9 +876,18 @@ public class GamePanel extends JPanel implements Runnable{
         stage02BossIntroPlayed = false;
         stage02BossActivated = false;
         activeCutscene = CUTSCENE_NONE;
+        stage3ChaseStarted = false;
+        pendingReturnToTitleAfterDialogue = false;
+        clearStage3CutsceneMarkers();
+        stage3MoveToClueTicks = 0;
+        stage3BarrierBroken = false;
 
         int currentLife = player.life;
+        boolean hadAxe = player.hasAxe;
         player.setDefaultValues();
+        if (hadAxe || "/maps/stage03.txt".equals(currentMapPath)) {
+            player.hasAxe = true;
+        }
         player.life = devSettings.isUnlimitedHealthEnabled()
                 ? player.maxLife
                 : Math.max(1, Math.min(currentLife, player.maxLife));
@@ -815,11 +903,11 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public int getCameraStageX() {
-        return Math.round(cameraStageX);
+        return Math.round(cameraStageX + cameraShakeOffsetX);
     }
 
     public int getCameraStageY() {
-        return Math.round(cameraStageY);
+        return Math.round(cameraStageY + cameraShakeOffsetY);
     }
 
     public Point stageToScreenPoint(int stageX, int stageY) {
@@ -989,6 +1077,19 @@ public class GamePanel extends JPanel implements Runnable{
         if (minionEffectTicks > 0) {
             minionEffectTicks--;
         }
+        if (cameraShakeTicks > 0) {
+            cameraShakeTicks--;
+            cameraShakeOffsetX = getRandomCameraShakeOffset();
+            cameraShakeOffsetY = getRandomCameraShakeOffset();
+            if (cameraShakeTicks == 0) {
+                cameraShakeMagnitude = 0;
+                cameraShakeOffsetX = 0f;
+                cameraShakeOffsetY = 0f;
+            }
+        } else {
+            cameraShakeOffsetX = 0f;
+            cameraShakeOffsetY = 0f;
+        }
     }
 
     private SuperObject findObjectByName(String objectName) {
@@ -1023,7 +1124,11 @@ public class GamePanel extends JPanel implements Runnable{
 
         if (isCandleSequenceCorrect()) {
             candlePuzzleSolved = true;
-            ui.showMessage("The candles burn steadily.\n\nSomething clicked in the distance.");
+            if ("/maps/stage03.txt".equals(currentMapPath)) {
+                startStage3EscapeCutscene();
+            } else {
+                ui.showMessage("The candles burn steadily.\n\nSomething clicked in the distance.");
+            }
         } else {
             turnOffAllCandles();
             litCandleOrder.clear();
@@ -1047,6 +1152,10 @@ public class GamePanel extends JPanel implements Runnable{
 
     public boolean isCandlePuzzleSolved() {
         return candlePuzzleSolved;
+    }
+
+    public boolean isStage3ChaseStarted() {
+        return stage3ChaseStarted;
     }
 
     private void resetCandlePuzzleState() {
@@ -1088,8 +1197,404 @@ public class GamePanel extends JPanel implements Runnable{
         return true;
     }
 
+    public void completeStage3Escape() {
+        if (!"/maps/stage03.txt".equals(currentMapPath)) {
+            return;
+        }
+
+        stopMusic();
+        ui.showMessage("You make it through the door.\n\nThe hallway beyond is quiet.\n\nFor now.");
+        pendingReturnToTitleAfterDialogue = true;
+        gameState = playState;
+    }
+
+    private void startStage3EscapeCutscene() {
+        if (!"/maps/stage03.txt".equals(currentMapPath) || stage3ChaseStarted) {
+            return;
+        }
+
+        stage3ClueMarker = assetSetter.findMapMarker(currentMapPath, "C");
+        stage3ClueApproachTile = findNearbyWalkableTile(stage3ClueMarker, 2);
+        stage3BreakMarkers = assetSetter.findMapMarkers(currentMapPath, "XX");
+        stage3SafeMarkers = assetSetter.findMapMarkers(currentMapPath, "Y");
+        stage3BossMarker = assetSetter.findMapMarker(currentMapPath, "S");
+        stage3BreakApproachTile = findStage3BreakApproachTile();
+        stage3SafeApproachTile = findStage3SafeApproachTile();
+
+        if (stage3ClueMarker == null || stage3ClueApproachTile == null
+                || stage3BreakMarkers.isEmpty() || stage3BreakApproachTile == null
+                || stage3SafeMarkers.isEmpty() || stage3SafeApproachTile == null
+                || stage3BossMarker == null) {
+            ui.showMessage("The candles burn steadily.\n\nSomething stirs in the room.");
+            return;
+        }
+
+        stage3ChaseStarted = true;
+        stage3MoveToClueTicks = 0;
+        stage3BarrierBroken = false;
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+        activeCutscene = CUTSCENE_STAGE3_ESCAPE;
+        cutscenePhase = CUTSCENE_STAGE3_MOVE_TO_CLUE;
+        gameState = cutsceneState;
+    }
+
+    private void updateStage3EscapeCutscene() {
+        if (cutscenePhase == CUTSCENE_STAGE3_MOVE_TO_CLUE) {
+            stage3MoveToClueTicks++;
+            boolean nearClue = isPlayerNearTile(stage3ClueMarker.x, stage3ClueMarker.y, 2);
+            boolean reachedApproach = movePlayerTowardTile(stage3ClueApproachTile.x, stage3ClueApproachTile.y, 2.8f);
+            if (nearClue || reachedApproach || stage3MoveToClueTicks >= 180) {
+                startCameraShake(90, 8);
+                vignette.setEnemyProximityLevel(0.80f);
+                vignette.setEnemyFlickerLevel(0.75f);
+                ui.showMessage("The candles flare up all at once.\n\n"
+                        + "No... that's wrong.\n\n"
+                        + "Why is the room getting darker?\n\n"
+                        + "The floor is shaking...");
+                cutscenePhase = CUTSCENE_STAGE3_PLAYER_PANIC;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_PLAYER_PANIC) {
+            if (!ui.isDialogueActive()) {
+                ui.showMessage("Jhon Pork and Jerky Jake: RUNNNN!!");
+                cutscenePhase = CUTSCENE_STAGE3_GHOST_WARNING;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_GHOST_WARNING) {
+            if (!ui.isDialogueActive()) {
+                cutscenePhase = CUTSCENE_STAGE3_RUN_TO_BARRIER;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_RUN_TO_BARRIER) {
+            boolean reachedApproach = movePlayerTowardTile(stage3BreakApproachTile.x, stage3BreakApproachTile.y, 4.5f);
+            boolean nearBarrier = isPlayerNearAnyTile(stage3BreakMarkers, 1);
+            if ((reachedApproach || nearBarrier) && !stage3BarrierBroken) {
+                breakStage3CutsceneBarrier();
+                stage3BarrierBroken = true;
+                playSE(3);
+            }
+            if (stage3BarrierBroken) {
+                cutscenePhase = CUTSCENE_STAGE3_RUN_TO_SAFE_TILE;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_RUN_TO_SAFE_TILE) {
+            boolean reachedApproach = movePlayerTowardTile(stage3SafeApproachTile.x, stage3SafeApproachTile.y, 4.5f);
+            boolean nearSafeZone = isPlayerNearAnyTile(stage3SafeMarkers, 0);
+            if (reachedApproach || nearSafeZone) {
+                cameraShakeTicks = 0;
+                cameraShakeMagnitude = 0;
+                cameraShakeOffsetX = 0f;
+                cameraShakeOffsetY = 0f;
+                vignette.setEnemyProximityLevel(0f);
+                vignette.setEnemyFlickerLevel(0f);
+                cutsceneTargetStageX = stage3BossMarker.x * tileSize;
+                cutsceneTargetStageY = stage3BossMarker.y * tileSize;
+                cutscenePhase = CUTSCENE_STAGE3_PAN_TO_BOSS;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_PAN_TO_BOSS) {
+            if (moveCameraToward(cutsceneTargetStageX, cutsceneTargetStageY, CAMERA_PAN_SPEED * 1.4f)) {
+                summonStage3ChaseEnemies();
+                cutsceneHoldTicks = STAGE3_BOSS_PAN_HOLD_TICKS;
+                cutscenePhase = CUTSCENE_STAGE3_HOLD_ON_BOSS;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_HOLD_ON_BOSS) {
+            if (cutsceneHoldTicks > 0) {
+                cutsceneHoldTicks--;
+            } else {
+                cutscenePhase = CUTSCENE_STAGE3_RETURN_AND_START_CHASE;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_RETURN_AND_START_CHASE) {
+            if (moveCameraToward(player.stageX, player.stageY, CAMERA_PAN_SPEED * 1.4f)) {
+                activeCutscene = CUTSCENE_NONE;
+                gameState = playState;
+            }
+        }
+    }
+
+    private boolean movePlayerTowardTile(int tileCol, int tileRow, float moveSpeed) {
+        int targetStageX = tileCol * tileSize;
+        int targetStageY = tileRow * tileSize;
+        int deltaX = targetStageX - player.stageX;
+        int deltaY = targetStageY - player.stageY;
+
+        if (Math.abs(deltaX) <= 2 && Math.abs(deltaY) <= 2) {
+            player.stageX = targetStageX;
+            player.stageY = targetStageY;
+            return true;
+        }
+
+        String pathDirection = player.getPathDirectionToStagePoint(targetStageX, targetStageY);
+        if (pathDirection == null) {
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                pathDirection = deltaX > 0 ? "right" : "left";
+            } else {
+                pathDirection = deltaY > 0 ? "down" : "up";
+            }
+        }
+
+        player.direction = pathDirection;
+        player.speed = moveSpeed;
+        player.collisionOn = false;
+        cChecker.checkTile(player);
+        if (!player.collisionOn) {
+            switch (pathDirection) {
+                case "up":
+                    player.moveStage(0, -moveSpeed);
+                    break;
+                case "down":
+                    player.moveStage(0, moveSpeed);
+                    break;
+                case "left":
+                    player.moveStage(-moveSpeed, 0);
+                    break;
+                case "right":
+                    player.moveStage(moveSpeed, 0);
+                    break;
+            }
+        }
+        cameraStageX = player.stageX;
+        cameraStageY = player.stageY;
+        player.updateAnimationOnly();
+        return false;
+    }
+
+    private Point getPreferredAdjacentTile(Point markerTile) {
+        if (markerTile == null) {
+            return null;
+        }
+
+        int[][] candidates = {
+                {markerTile.x, markerTile.y + 1},
+                {markerTile.x - 1, markerTile.y},
+                {markerTile.x + 1, markerTile.y},
+                {markerTile.x, markerTile.y - 1}
+        };
+
+        for (int[] candidate : candidates) {
+            if (!isPathTileBlocked(candidate[0], candidate[1])) {
+                return new Point(candidate[0], candidate[1]);
+            }
+        }
+
+        return new Point(markerTile.x, markerTile.y);
+    }
+
+    private void breakStage3CutsceneBarrier() {
+        if (stage3BreakMarkers == null || stage3BreakMarkers.isEmpty()) {
+            return;
+        }
+
+        for (int i = 0; i < obj.length; i++) {
+            if (!(obj[i] instanceof objects.OBJ_CutsceneBreakable)) {
+                continue;
+            }
+
+            int objCol = obj[i].stageX / tileSize;
+            int objRow = obj[i].stageY / tileSize;
+            for (Point breakMarker : stage3BreakMarkers) {
+                if (objCol == breakMarker.x && objRow == breakMarker.y) {
+                    obj[i] = null;
+                    break;
+                }
+            }
+        }
+    }
+
+    private Point findStage3BreakApproachTile() {
+        if (stage3BreakMarkers == null || stage3BreakMarkers.isEmpty()) {
+            return null;
+        }
+
+        Point bestTile = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (Point breakMarker : stage3BreakMarkers) {
+            Point candidate = findPreferredBreakApproachTile(breakMarker);
+            if (candidate == null) {
+                continue;
+            }
+
+            int distance = Math.abs(candidate.x - player.stageX / tileSize) + Math.abs(candidate.y - player.stageY / tileSize);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestTile = candidate;
+            }
+        }
+        return bestTile;
+    }
+
+    private Point findStage3SafeApproachTile() {
+        if (stage3SafeMarkers == null || stage3SafeMarkers.isEmpty()) {
+            return null;
+        }
+
+        Point bestTile = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (Point safeMarker : stage3SafeMarkers) {
+            Point candidate = findPreferredSafeApproachTile(safeMarker);
+            if (candidate == null) {
+                continue;
+            }
+
+            int distance = Math.abs(candidate.x - player.stageX / tileSize) + Math.abs(candidate.y - player.stageY / tileSize);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestTile = candidate;
+            }
+        }
+        return bestTile;
+    }
+
+    private Point findPreferredSafeApproachTile(Point markerTile) {
+        if (markerTile == null) {
+            return null;
+        }
+
+        if (!isPathTileBlocked(markerTile.x, markerTile.y)) {
+            return new Point(markerTile.x, markerTile.y);
+        }
+
+        int[][] candidates = {
+                {markerTile.x - 1, markerTile.y},
+                {markerTile.x, markerTile.y - 1},
+                {markerTile.x, markerTile.y + 1},
+                {markerTile.x + 1, markerTile.y}
+        };
+
+        for (int[] candidate : candidates) {
+            if (!isPathTileBlocked(candidate[0], candidate[1])) {
+                return new Point(candidate[0], candidate[1]);
+            }
+        }
+
+        return findNearbyWalkableTile(markerTile, 2);
+    }
+
+    private Point findPreferredBreakApproachTile(Point markerTile) {
+        int[][] candidates = {
+                {markerTile.x - 1, markerTile.y},
+                {markerTile.x, markerTile.y - 1},
+                {markerTile.x, markerTile.y + 1},
+                {markerTile.x + 1, markerTile.y}
+        };
+
+        for (int[] candidate : candidates) {
+            if (!isPathTileBlocked(candidate[0], candidate[1])) {
+                return new Point(candidate[0], candidate[1]);
+            }
+        }
+
+        return findNearbyWalkableTile(markerTile, 2);
+    }
+
+    private boolean isPlayerNearAnyTile(java.util.List<Point> tiles, int radiusTiles) {
+        for (Point tile : tiles) {
+            if (isPlayerNearTile(tile.x, tile.y, radiusTiles)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void summonStage3ChaseEnemies() {
+        MON_Stage3BossMomo stage3Boss = new MON_Stage3BossMomo(this);
+        stage3Boss.activateForStage3Chase();
+        assetSetter.spawnMonster(stage3Boss, stage3BossMarker.x, stage3BossMarker.y);
+
+        java.util.List<Point> phantomMarkers = assetSetter.findMapMarkers(currentMapPath, "E");
+        int variant = 1;
+        for (Point marker : phantomMarkers) {
+            MON_Dementor phantom = new MON_Dementor(this, variant);
+            phantom.activateForStage3Chase();
+            assetSetter.spawnMonster(phantom, marker.x, marker.y);
+            variant = variant == 4 ? 1 : variant + 1;
+        }
+
+        java.util.List<Point> stage2BossMarkers = assetSetter.findMapMarkers(currentMapPath, "S2");
+        for (Point marker : stage2BossMarkers) {
+            MON_Stage2WitherBoss boss = new MON_Stage2WitherBoss(this);
+            boss.activateForStage3Chase();
+            assetSetter.spawnMonster(boss, marker.x, marker.y);
+        }
+    }
+
+    private void clearStage3CutsceneMarkers() {
+        stage3ClueMarker = null;
+        stage3ClueApproachTile = null;
+        stage3BreakMarkers.clear();
+        stage3BreakApproachTile = null;
+        stage3SafeMarkers.clear();
+        stage3SafeApproachTile = null;
+        stage3BossMarker = null;
+    }
+
+    private void startCameraShake(int ticks, int magnitude) {
+        cameraShakeTicks = Math.max(cameraShakeTicks, ticks);
+        cameraShakeMagnitude = Math.max(cameraShakeMagnitude, magnitude);
+    }
+
+    private float getRandomCameraShakeOffset() {
+        if (cameraShakeTicks <= 0 || cameraShakeMagnitude <= 0) {
+            return 0f;
+        }
+
+        return (thoughtRng.nextFloat() * (cameraShakeMagnitude * 2f)) - cameraShakeMagnitude;
+    }
+
+    private Point findNearbyWalkableTile(Point markerTile, int radius) {
+        if (markerTile == null) {
+            return null;
+        }
+
+        Point bestTile = null;
+        int bestScore = Integer.MAX_VALUE;
+
+        for (int row = markerTile.y - radius; row <= markerTile.y + radius; row++) {
+            for (int col = markerTile.x - radius; col <= markerTile.x + radius; col++) {
+                if (col == markerTile.x && row == markerTile.y) {
+                    continue;
+                }
+                if (isPathTileBlocked(col, row)) {
+                    continue;
+                }
+
+                int score = Math.abs(col - markerTile.x) + Math.abs(row - markerTile.y);
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestTile = new Point(col, row);
+                }
+            }
+        }
+
+        return bestTile;
+    }
+
+    private boolean isPlayerNearTile(int tileCol, int tileRow, int radiusTiles) {
+        int playerCol = getPlayerTileCol();
+        int playerRow = getPlayerTileRow();
+        return Math.abs(playerCol - tileCol) <= radiusTiles
+                && Math.abs(playerRow - tileRow) <= radiusTiles;
+    }
+
     public void run(){
-        double drawInterval = 1000000000/FPS;
+        double drawInterval = 1_000_000_000.0 / FPS;
         double delta = 0;
         long lastTime = System.nanoTime();
         long currentTime;
@@ -1139,7 +1644,6 @@ public class GamePanel extends JPanel implements Runnable{
         int drawY = (getHeight() - drawHeight) / 2;
 
         g2.drawImage(screenBuffer, drawX, drawY, drawWidth, drawHeight, null);
-        g2.dispose();
     }
 
     private void drawGame(Graphics2D g2) {

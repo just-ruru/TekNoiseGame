@@ -16,6 +16,7 @@ public class MON_Stage2WitherBoss extends Entity {
     private static final int DOOR_ARRIVAL_DISTANCE_TILES = 1;
     private boolean active = false;
     private boolean firstSummonDone = false;
+    private boolean summonsEnabled = true;
     private int summonCounter = 0;
     private int returnToDoorCounter = 0;
     private int returnToDoorTicks = 0;
@@ -62,6 +63,13 @@ public class MON_Stage2WitherBoss extends Entity {
 
     public boolean isActive() {
         return active;
+    }
+
+    public void activateForStage3Chase() {
+        active = true;
+        summonsEnabled = false;
+        firstSummonDone = true;
+        summonCounter = 0;
     }
 
     @Override
@@ -172,6 +180,9 @@ public class MON_Stage2WitherBoss extends Entity {
     }
 
     private void handleSummons() {
+        if (!summonsEnabled) {
+            return;
+        }
         if (!firstSummonDone) {
             gp.spawnStage2Minions(stageX, stageY, 5);
             firstSummonDone = true;

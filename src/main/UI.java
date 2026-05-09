@@ -136,10 +136,12 @@ public class UI {
         }
 
         if (gp.gameState == gp.playState) {
-            drawPlayerLife();
+            if (!isDialogueActive()) {
+                drawPlayerLife();
+                drawStaminaBar();
+                drawAxeCooldown();
+            }
             drawKeyInventory();
-            drawStaminaBar();
-            drawAxeCooldown();
             drawInteractionPrompt();
         }
 
@@ -538,10 +540,11 @@ public class UI {
                 return "Press E to pick up";
             case "DoorStage1":
             case "DoorStage3":
-                return "Press E to open";
+                return "Press E to escape";
             case "DoorStage2":
                 return gp.player.hasAxe ? "Press E to break" : "Press E to inspect";
             case "BreakableTable":
+            case "CutsceneBreakable":
                 return gp.player.hasAxe ? "Press E to break" : "Press E to inspect";
             case "HealthBag":
                 return "Press E to use";

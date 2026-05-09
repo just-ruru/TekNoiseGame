@@ -439,13 +439,13 @@ public class Player extends Entity{
 
                 case "DoorStage3":
                     if (keyH.interactPressed && interactCooldown == 0) {
-                        if(hasKey > 0) {
-                            gp.playSE(3);
-                            hasKey--;
-                            gp.ui.showMessage(getDoorOpenedDialogue());
-                            gp.startMapTransition("/maps/stage03.txt");
+                        if (!gp.isCandlePuzzleSolved()) {
+                            gp.ui.showMessage("The door is open.\n\nBut I can't leave yet.\n\nSomething in this room still feels unfinished.");
+                        } else if (!gp.isStage3ChaseStarted()) {
+                            gp.ui.showMessage("The exit is there.\n\nOnce this room breaks loose, I need to run for it.");
                         } else {
-                            gp.ui.showMessage(getLockedDoorDialogue());
+                            gp.playSE(3);
+                            gp.completeStage3Escape();
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -479,6 +479,7 @@ public class Player extends Entity{
                     break;
 
                 case "BreakableTable":
+                case "CutsceneBreakable":
                     if (keyH.interactPressed && interactCooldown == 0) {
                         if (!hasAxe) {
                             gp.ui.showMessage("This table is cracked, but I cannot break it by hand.");
@@ -550,6 +551,10 @@ public class Player extends Entity{
         return mapPath.equals(getStagePath());
     }
 
+    private boolean mapExists(String mapPath) {
+        return getClass().getResourceAsStream(mapPath) != null;
+    }
+
     private String getSwitchAlreadyOnDialogue() {
         if (isStage("/maps/stage02.txt")) {
             return "The repaired switch is humming steadily.\n\nLeave it alone. This room needs every bit of light.";
@@ -557,7 +562,7 @@ public class Player extends Entity{
         if (isStage("/maps/stage03.txt")) {
             return "The switch is already holding the lights together.\n\nDo not touch it again.";
         }
-        return "The switch is already on.\n\nWe need it to stay on, so don't touch it!";
+        return "The lights are finally on.\n\nI should leave the switch alone.";
     }
 
     private String getBrokenSwitchDialogue() {
@@ -567,7 +572,7 @@ public class Player extends Entity{
         if (isStage("/maps/stage03.txt")) {
             return "The switch is dead.\n\nIt needs a replacement part before it can work.";
         }
-        return "The switch seems to be broken...\n\nThere should be something here that can fix it.";
+        return "The switch is broken.\n\nSomething inside it is missing.\n\nMaybe the replacement part is still somewhere in this room.";
     }
 
     private String getSwitchFixedDialogue() {
@@ -597,7 +602,7 @@ public class Player extends Entity{
         if (isStage("/maps/stage03.txt")) {
             return "You checked the table carefully.\n\nNothing but scratches.";
         }
-        return "You searched the table.\n\nNothing useful here.";
+        return "You searched the drawer.\n\nNothing useful.\n\nKeep checking the orange tables.";
     }
 
     private String getKeyTableDialogue() {
@@ -615,7 +620,7 @@ public class Player extends Entity{
             return "You used 1 key.\n\nThe next door unlocked.";
         }
         if (isStage("/maps/stage03.txt")) {
-            return "You used 1 key.\n\nThe door gives way.";
+            return "The door is already open.\n\nJust keep moving.";
         }
         return "You used 1 key.\n\nThe door opened!";
     }
@@ -625,44 +630,39 @@ public class Player extends Entity{
             return "The door will not move.\n\nThere has to be a key somewhere in this room.";
         }
         if (isStage("/maps/stage03.txt")) {
-            return "Locked again.\n\nFind the key before this place finds you.";
+            return "The exit is right there.\n\nI just need to survive long enough to reach it.";
         }
-        return "The door is locked.\n\nYou need a key.";
+        return "Locked.\n\nIf Jhon Pork was right, one of the orange drawer tables might have the key.";
     }
 
     private String getTablePaperDialogue() {
         if(isStage("/maps/stage01.txt")){
             return "Name: Jhon Pork Tocino\n\n"
-                    + "Hmmm...... *turns the page\n\n"
-                    + "Scribles* Scribles* \n\n"
-                    + "This is getting creepy...\n\n"
-                    + "*turns the page\n\n"
-                    + "Ooh something is written at the back part\n\n"
-                    + "\"Idk if someone will eventually read this...\"\n\n" + "I am JPT,,, a student just like you\n\n"
-                    + "\"This place... isnt what u think it is...\n\n"
-                    + "\"I've been studying endlessly just like you, with no sleep at all\"\n\n"
-                    + "\"and then I got to class,, fell asleep,, and when I woke up,, I became trapped here\"\n\n"
-                    + "\"I've been wandering around and...\"\n\n" + "\"there's a few things you should now\"\n\n"
-                    + "\"1. there are shadowy creatures here that wander around, avoid them\"\n\n"
-                    + "\"2. you should check the tables with drawers for items\"\n\n" + "\"you should be able to find some eventually...\"\n\n" + " I hope\"\n\n"
-                    + "\"and lastly... I left some couple of pages here and there to maybe help you\"\n\n"
-                    + "\"...\"\n\n"
-                    + "\"You should read them\"\n\n"
-                    + "\"...\"\n\n"
-                    + "\"Anyways, I was trying to fix the switch here but I forgot where my bag was..\"\n\n so maybe find that first---\n\n"
-                    + "\"The lights...\"\n\n\"they're...\"\n\n\"they're...\"\n\n\"here...\"\n\n"
-                    + "\"Remember...\"\n\n\"AVOID THEM!!!!!\"\n\n"
-                    + "The rest of the page was ripped off with some red paint splots over it...\n\n"
-                    + "... I wonder what happened...";
+                    + "Most of the pages are smeared and torn.\n\n"
+                    + "One passage is still readable:\n\n"
+                    + "\"If you're reading this, you're probably trapped here too.\"\n\n"
+                    + "\"I was a student, just like you. I pushed myself too far, fell asleep in class...\"\n\n"
+                    + "\"When I woke up, this place was all that was left.\"\n\n"
+                    + "\"There are shadow things wandering around here. If you see them, stay away.\"\n\n"
+                    + "\"Search the tables with drawers. People leave things behind. Sometimes useful things.\"\n\n"
+                    + "\"I was trying to fix the light switch, but I lost my bag before I could finish.\"\n\n"
+                    + "\"If you find it, maybe you can get the lights back on.\"\n\n"
+                    + "The final lines trail off into shaky scratches:\n\n"
+                    + "\"The lights don't keep them out for long...\"\n\n"
+                    + "\"If they get close, run.\"";
         }
 
         if (isStage("/maps/stage02.txt")) {
             return "insert text here kyle";
         }
         if (isStage("/maps/stage03.txt")) {
-            return "The page is almost unreadable.\n\n"
-                    + "One line remains clear:\n\n"
-                    + "\"If the lights fail, run before the whispers get close.\"";
+            return "The page is water-damaged, but a sketch is still visible.\n\n"
+                    + "Four candle marks are connected in a jagged stroke:\n\n"
+                    + "upper left -> upper right -> lower left -> lower right\n\n"
+                    + "Someone wrote beneath it:\n\n"
+                    + "\"Follow the shape. Do not second-guess it.\"\n\n"
+                    + "The last line is scratched in hard enough to tear the page:\n\n"
+                    + "\"When the room answers back, run.\"";
         }
         return "bye muna world";
     }
@@ -674,7 +674,7 @@ public class Player extends Entity{
         if (isStage("/maps/stage03.txt")) {
             return "You opened the bag.\n\nA switch part is wrapped in old cloth.";
         }
-        return "You searched the bag.\n\nInside is a spare switch that might fix the lights.";
+        return "You searched the bag.\n\nInside is a replacement switch.\n\nThis must be what was missing.";
     }
 
     public void contactMonster(int i){

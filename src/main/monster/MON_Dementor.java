@@ -15,6 +15,7 @@ public class MON_Dementor extends Entity {
     private int originalX = -1;
     private int originalY = -1;
     private static final int WANDER_RADIUS = 3; // tiles
+    private boolean forceChase = false;
 
     public MON_Dementor(GamePanel gp, int imageVariant) {
         super(gp);
@@ -110,7 +111,7 @@ public class MON_Dementor extends Entity {
         int distanceY = Math.abs(stageY - playerY);
         int tileDistance = (distanceX + distanceY) / gp.tileSize;
 
-        if (tileDistance <= DETECTION_RANGE) {
+        if (forceChase || tileDistance <= DETECTION_RANGE) {
             // Player detected - chase mode
             speed = CHASE_SPEED;
 
@@ -182,5 +183,10 @@ public class MON_Dementor extends Entity {
                 }
             }
         }
+    }
+
+    public void activateForStage3Chase() {
+        forceChase = true;
+        speed = CHASE_SPEED;
     }
 }

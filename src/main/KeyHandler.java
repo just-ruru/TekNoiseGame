@@ -73,6 +73,13 @@ public class KeyHandler implements KeyListener {
             }
         }
 
+        if (gp.gameState == gp.introCutsceneState) {
+            if (code == KeyEvent.VK_ESCAPE) {
+                gp.skipIntroCutscene();
+                return;
+            }
+        }
+
         if(code == KeyEvent.VK_P){
             if(gp.gameState == gp.playState) {
                 gp.gameState = gp.pauseState;

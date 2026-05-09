@@ -1,6 +1,7 @@
 package main;
 
 import main.monster.MON_Dementor;
+import main.monster.MON_Stage3BossMomo;
 import main.monster.MON_Stage2WitherBoss;
 import npc.NPC_JhonPorkJerkyJake;
 import objects.OBJ_Bag;
@@ -169,34 +170,62 @@ public class AssetSetter {
     }
     
     private void setStage03Objects() {
-        gp.obj[0] = new OBJ_TablePaper();
-        gp.obj[0].stageX = 5 * gp.tileSize;
-        gp.obj[0].stageY = 5 * gp.tileSize;
+        int objectIndex = 0;
+        boolean doorPlaced = false;
+        List<Point> candleTiles = new ArrayList<>();
+        List<Point> breakableTableTiles = new ArrayList<>();
+        List<Point> cutsceneBreakTiles = new ArrayList<>();
 
-        gp.obj[1] = new OBJ_LightSwitch();
-        gp.obj[1].stageX = 2 * gp.tileSize;
-        gp.obj[1].stageY = 1 * gp.tileSize;
+        try {
+            InputStream is = getClass().getResourceAsStream("/maps/stage03.txt");
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
-        gp.obj[2] = new OBJ_Bag();
-        gp.obj[2].stageX = 15 * gp.tileSize;
-        gp.obj[2].stageY = 10 * gp.tileSize;
+            String line;
+            int row = 0;
+            while ((line = br.readLine()) != null) {
+                String[] tokens = line.trim().split("\\s+");
+                for (int col = 0; col < tokens.length; col++) {
+                    String token = tokens[col];
 
-        gp.obj[3] = new OBJ_Key_Table();
-        gp.obj[3].stageX = 25 * gp.tileSize;
-        gp.obj[3].stageY = 15 * gp.tileSize;
+                    if ("D".equalsIgnoreCase(token) && !doorPlaced) {
+                        objectIndex = addObject(objectIndex, new OBJ_DoorStage3(), col, row);
+                        doorPlaced = true;
+                    } else if ("C".equalsIgnoreCase(token)) {
+                        objectIndex = addObject(objectIndex, new OBJ_TablePaper(), col, row);
+                    } else if ("H".equalsIgnoreCase(token)) {
+                        objectIndex = addObject(objectIndex, new OBJ_HealthBag(), col, row);
+                    } else if ("N".equalsIgnoreCase(token)) {
+                        candleTiles.add(new Point(col, row));
+                    } else if ("XX".equalsIgnoreCase(token)) {
+                        cutsceneBreakTiles.add(new Point(col, row));
+                    } else if ("X".equalsIgnoreCase(token)) {
+                        breakableTableTiles.add(new Point(col, row));
+                    }
+                }
+                row++;
+            }
 
-        // Stage 3 door to next stage
-        gp.obj[4] = new OBJ_DoorStage3();
-        gp.obj[4].stageX = 28 * gp.tileSize;
-        gp.obj[4].stageY = 0 * gp.tileSize;
+            br.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
-        gp.obj[5] = new OBJ_Empty_Table();
-        gp.obj[5].stageX = 9 * gp.tileSize;
-        gp.obj[5].stageY = 8 * gp.tileSize;
+        candleTiles.sort(Comparator.comparingInt((Point point) -> point.y).thenComparingInt(point -> point.x));
+        for (int i = 0; i < candleTiles.size(); i++) {
+            Point tile = candleTiles.get(i);
+            objectIndex = addObject(objectIndex, new OBJ_Candle(i + 1), tile.x, tile.y);
+        }
 
-        gp.obj[6] = new OBJ_Empty_Table();
-        gp.obj[6].stageX = 18 * gp.tileSize;
-        gp.obj[6].stageY = 14 * gp.tileSize;
+        int tableVariant = 1;
+        for (Point tile : breakableTableTiles) {
+            objectIndex = addObject(objectIndex, new OBJ_BreakableTable(tableVariant), tile.x, tile.y);
+            tableVariant = tableVariant % 4 + 1;
+        }
+
+        for (Point tile : cutsceneBreakTiles) {
+            objectIndex = addObject(objectIndex, new OBJ_CutsceneBreakable(tableVariant), tile.x, tile.y);
+            tableVariant = tableVariant % 4 + 1;
+        }
     }
 
 //        gp.obj[3] = new OBJ_Door();
@@ -260,7 +289,7 @@ public class AssetSetter {
         gp.monster[0].stageY = gp.tileSize * bossTile.y;
     }
 
-    private Point findMapMarker(String mapPath, String marker) {
+    public Point findMapMarker(String mapPath, String marker) {
         try {
             InputStream is = getClass().getResourceAsStream(mapPath);
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
@@ -283,18 +312,45 @@ public class AssetSetter {
         return null;
     }
 
+    public List<Point> findMapMarkers(String mapPath, String marker) {
+        List<Point> markers = new ArrayList<>();
+        try {
+            InputStream is = getClass().getResourceAsStream(mapPath);
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            String line;
+            int row = 0;
+            while ((line = br.readLine()) != null) {
+                String[] tokens = line.trim().split("\\s+");
+                for (int col = 0; col < tokens.length; col++) {
+                    if (marker.equalsIgnoreCase(tokens[col])) {
+                        markers.add(new Point(col, row));
+                    }
+                }
+                row++;
+            }
+            br.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return markers;
+    }
+
     private void setStage03Monsters() {
-        gp.monster[0] = new MON_Dementor(gp, 4);
-        gp.monster[0].stageX = gp.tileSize * 12;
-        gp.monster[0].stageY = gp.tileSize * 9;
+        // Stage 3 stays quiet until the candle puzzle cutscene triggers the chase sequence.
+    }
 
-        gp.monster[1] = new MON_Dementor(gp, 1);
-        gp.monster[1].stageX = gp.tileSize * 22;
-        gp.monster[1].stageY = gp.tileSize * 14;
+    public int spawnMonster(entity.Entity entity, int tileCol, int tileRow) {
+        for (int i = 0; i < gp.monster.length; i++) {
+            if (gp.monster[i] == null) {
+                gp.monster[i] = entity;
+                gp.monster[i].stageX = tileCol * gp.tileSize;
+                gp.monster[i].stageY = tileRow * gp.tileSize;
+                return i;
+            }
+        }
 
-        gp.monster[2] = new MON_Dementor(gp, 2);
-        gp.monster[2].stageX = gp.tileSize * 26;
-        gp.monster[2].stageY = gp.tileSize * 5;
+        System.out.println("Warning: monster array is full, skipped " + entity.name + " at " + tileCol + "," + tileRow);
+        return -1;
     }
 }
 

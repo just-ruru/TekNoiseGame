@@ -38,9 +38,7 @@ public class CollisionChecker {
                 }
                 tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityTopRow];
                 tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityTopRow];
-                if (gp.tileM.tile[tileNum1].collision == true || gp.tileM.tile[tileNum2].collision == true) {
-                    entity.collisionOn = true;
-                }
+                checkTileCollision(entity, tileNum1, tileNum2);
                 break;
 
             case "down":
@@ -51,9 +49,7 @@ public class CollisionChecker {
                 }
                 tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityBottomRow];
                 tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityBottomRow];
-                if (gp.tileM.tile[tileNum1].collision == true || gp.tileM.tile[tileNum2].collision == true) {
-                    entity.collisionOn = true;
-                }
+                checkTileCollision(entity, tileNum1, tileNum2);
                 break;
 
             case "left":
@@ -64,9 +60,7 @@ public class CollisionChecker {
                 }
                 tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityTopRow];
                 tileNum2 = gp.tileM.mapTileNum[entityLeftCol][entityBottomRow];
-                if (gp.tileM.tile[tileNum1].collision == true || gp.tileM.tile[tileNum2].collision == true) {
-                    entity.collisionOn = true;
-                }
+                checkTileCollision(entity, tileNum1, tileNum2);
                 break;
 
             case "right":
@@ -77,14 +71,25 @@ public class CollisionChecker {
                 }
                 tileNum1 = gp.tileM.mapTileNum[entityRightCol][entityTopRow];
                 tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityBottomRow];
-                if (gp.tileM.tile[tileNum1].collision == true || gp.tileM.tile[tileNum2].collision == true) {
-                    entity.collisionOn = true;
-                }
+                checkTileCollision(entity, tileNum1, tileNum2);
                 break;
         }
     }
 
-    // Returns true if the given (col,row) is outside the world bounds.
+    private void checkTileCollision(Entity entity, int tileNum1, int tileNum2) {
+        // During stage 3 chase, only block tiles with value 1 (walls) for enemies, not player
+        if (gp.isStage3ChaseStarted() && entity != gp.player) {
+            if (tileNum1 == 1 || tileNum2 == 1) {
+                entity.collisionOn = true;
+            }
+        } else {
+            if (gp.tileM.tile[tileNum1].collision == true || gp.tileM.tile[tileNum2].collision == true) {
+                entity.collisionOn = true;
+            }
+        }
+    }
+
+    // Returns true if given (col,row) is outside world bounds.
     private boolean isOutOfMap(int col, int row) {
         return col < 0 || row < 0 || col >= gp.maxStageCol || row >= gp.maxStageRow;
     }
