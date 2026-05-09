@@ -26,7 +26,7 @@ public class MouseHandler extends MouseAdapter {
     public void mousePressed(MouseEvent e) {
         gp.requestFocusInWindow();
 
-        if (gp.gameState != gp.titleState || !SwingUtilities.isLeftMouseButton(e)) {
+        if (!SwingUtilities.isLeftMouseButton(e)) {
             return;
         }
 
@@ -35,7 +35,12 @@ public class MouseHandler extends MouseAdapter {
             return;
         }
 
-        if (gp.ui.activateTitleCommandAt(gamePoint.x, gamePoint.y)) {
+        if (gp.gameState == gp.titleState && gp.ui.activateTitleCommandAt(gamePoint.x, gamePoint.y)) {
+            gp.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            return;
+        }
+
+        if (gp.gameState == gp.characterSelectState && gp.ui.handleCharacterSelectionClickAt(gamePoint.x, gamePoint.y)) {
             gp.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         }
     }
@@ -46,13 +51,23 @@ public class MouseHandler extends MouseAdapter {
     }
 
     private void updateTitleHover(MouseEvent e) {
-        if (gp.gameState != gp.titleState) {
+        if (gp.gameState != gp.titleState && gp.gameState != gp.characterSelectState) {
             gp.setCursor(Cursor.getDefaultCursor());
             return;
         }
 
         Point gamePoint = gp.toGamePoint(e.getX(), e.getY());
-        boolean hoveringButton = gamePoint != null && gp.ui.selectTitleCommandAt(gamePoint.x, gamePoint.y);
+        boolean hoveringButton = false;
+        if (gamePoint != null) {
+            if (gp.gameState == gp.titleState) {
+                hoveringButton = gp.ui.selectTitleCommandAt(gamePoint.x, gamePoint.y);
+            } else if (gp.gameState == gp.characterSelectState) {
+                hoveringButton = gp.ui.updateCharacterHoverAt(gamePoint.x, gamePoint.y);
+            }
+        } else if (gp.gameState == gp.characterSelectState) {
+            gp.ui.updateCharacterHoverAt(-1, -1);
+        }
+
         gp.setCursor(Cursor.getPredefinedCursor(
                 hoveringButton ? Cursor.HAND_CURSOR : Cursor.DEFAULT_CURSOR));
     }

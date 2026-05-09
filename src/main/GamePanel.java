@@ -86,6 +86,8 @@ public class GamePanel extends JPanel implements Runnable{
     public final  int pauseState = 2;
     public final int transitionState = 3;
     public final int cutsceneState = 4;
+    public final int introCutsceneState = 5;
+    public final int characterSelectState = 6;
     private static final int TRANSITION_NONE = 0;
     private static final int TRANSITION_MAP = 1;
     private static final int TRANSITION_TITLE_START = 2;
@@ -95,8 +97,7 @@ public class GamePanel extends JPanel implements Runnable{
     private String nextMapPath = null;
     private float fadeAlpha = 0f; // 0..1
     private final float fadeSpeed = 0.3f;
-    private final float titleStartFadeSpeed = 0.01f;
-    private static final int TITLE_START_BLACK_HOLD_TICKS = 14;
+    private final float titleStartFadeSpeed = 0.005f;
     private boolean fadeOutPhase = true;
     private int activeTransitionType = TRANSITION_NONE;
     private boolean showTitleDuringTransition = false;
@@ -132,6 +133,10 @@ public class GamePanel extends JPanel implements Runnable{
     private final java.util.List<Integer> litCandleOrder = new ArrayList<>();
     private boolean candlePuzzleSolved = false;
     private String pendingStartDialogue = null;
+    private IntroCutscenePlayer introCutscenePlayer;
+
+    /** Same order as the character selection UI: Lerler, Gasha, Nnyl, Gemal. */
+    private static final String[] CHARACTER_INTRO_CUTSCENE_IDS = { "llama", "gasha", "neil", "romare" };
 
     int playerX = player.stageX;
     int playerY = player.stageY;
@@ -284,6 +289,7 @@ public class GamePanel extends JPanel implements Runnable{
         stage02BossIntroPlayed = false;
         stage02BossActivated = false;
         activeCutscene = CUTSCENE_NONE;
+        disposeIntroCutscenePlayer();
         resetCandlePuzzleState();
         player.hasKey = 0;
         player.hasReplacementSwitch = false;
@@ -295,6 +301,7 @@ public class GamePanel extends JPanel implements Runnable{
         assetSetter.setMonster(currentMapPath);
         phantomVoice.setFile(6);
         applyPhantomVoiceVolume();
+        pendingStartDialogue = null;
         gameState = titleState;
     }
 
@@ -304,21 +311,86 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void startGameFromTitle() {
-        if (gameState == transitionState) {
+        if (gameState != titleState) {
             return;
         }
 
-        fadeAlpha = 1f;
-        fadeOutPhase = false;
-        activeTransitionType = TRANSITION_TITLE_START;
-        showTitleDuringTransition = false;
-        transitionHoldTicks = TITLE_START_BLACK_HOLD_TICKS;
-        playMusic(1);
         pendingStartDialogue = "woke up*\n\n"
                 + "what's happening... \n\n"
                 + "Its so dark...\n\n"
                 + "where is everybody...";
-        gameState = transitionState;
+        stopMusic();
+        disposeIntroCutscenePlayer();
+        introCutscenePlayer = new IntroCutscenePlayer(masterVolume);
+        if (!introCutscenePlayer.isAvailable()) {
+            finishIntroCutscene();
+            return;
+        }
+
+        introCutscenePlayer.start();
+        gameState = introCutsceneState;
+    }
+
+    /**
+     * characterIndex: 0..3 in the order shown on the character selection screen
+     * (Lerler, Gasha, Nnyl, Gemal).
+     */
+    public void startGameFromCharacterSelection(int characterIndex) {
+        if (gameState != characterSelectState) {
+            return;
+        }
+
+        if (characterIndex < 0 || characterIndex >= 4) {
+            return;
+        }
+
+        // Map selection order to the Player choice values (1..4).
+        choice = characterIndex + 1;
+
+        // Prepare a fresh run state so the correct character/map setup is ready
+        // when we finish any cutscene/transition.
+        stopMusic();
+        disposeIntroCutscenePlayer();
+
+        resetStageThoughtState();
+        stage01DoorRevealPlayed = false;
+        stage02BossIntroPlayed = false;
+        stage02BossActivated = false;
+        activeCutscene = CUTSCENE_NONE;
+        resetCandlePuzzleState();
+
+        player.hasKey = 0;
+        player.hasReplacementSwitch = false;
+        player.setDefaultValues();
+        player.setSpawnForMap(currentMapPath);
+
+        // Re-create the player so the correct sprite frames load for the chosen character.
+        player = new Player(this, keyH, choice);
+        player.hasKey = 0;
+        player.hasReplacementSwitch = false;
+        player.setDefaultValues();
+        player.setSpawnForMap(currentMapPath);
+
+        snapCameraToPlayer();
+        assetSetter.setObject(currentMapPath);
+        assetSetter.setMonster(currentMapPath);
+
+        phantomVoice.setFile(6);
+        applyPhantomVoiceVolume();
+        pendingStartDialogue = "woke up*\n\n"
+                + "what's happening... \n\n"
+                + "Its so dark...\n\n"
+                + "where is everybody...";
+
+        String cutsceneId = CHARACTER_INTRO_CUTSCENE_IDS[characterIndex];
+        introCutscenePlayer = new IntroCutscenePlayer(masterVolume, cutsceneId);
+        if (!introCutscenePlayer.isAvailable()) {
+            finishIntroCutscene();
+            return;
+        }
+
+        introCutscenePlayer.start();
+        gameState = introCutsceneState;
     }
 
     public void exitGame() {
@@ -365,6 +437,9 @@ public class GamePanel extends JPanel implements Runnable{
         if (gameState == cutsceneState) {
             updateCutscene();
         }
+        if (gameState == introCutsceneState) {
+            updateIntroCutscene();
+        }
         if (gameState == transitionState) {
             updateTransition();
         }
@@ -373,9 +448,21 @@ public class GamePanel extends JPanel implements Runnable{
             ui.advanceDialogue();
             keyH.interactPressed = false;
         }
-        if (gameState != playState && gameState != cutsceneState) {
+        if (gameState != playState && gameState != cutsceneState && gameState != introCutsceneState) {
             checkEnemyProximityDimming();
             vignette.update();
+        }
+    }
+
+    private void updateIntroCutscene() {
+        if (introCutscenePlayer == null) {
+            finishIntroCutscene();
+            return;
+        }
+
+        introCutscenePlayer.update();
+        if (introCutscenePlayer.isFinished()) {
+            finishIntroCutscene();
         }
     }
 
@@ -657,6 +744,24 @@ public class GamePanel extends JPanel implements Runnable{
         }
     }
 
+    private void finishIntroCutscene() {
+        disposeIntroCutscenePlayer();
+        fadeAlpha = 1f;
+        fadeOutPhase = false;
+        activeTransitionType = TRANSITION_TITLE_START;
+        showTitleDuringTransition = false;
+        transitionHoldTicks = 0;
+        playMusic(1);
+        gameState = transitionState;
+    }
+
+    private void disposeIntroCutscenePlayer() {
+        if (introCutscenePlayer != null) {
+            introCutscenePlayer.dispose();
+            introCutscenePlayer = null;
+        }
+    }
+
     public void startMapTransition(String mapPath) {
         if (gameState == transitionState) return;
         nextMapPath = mapPath;
@@ -680,6 +785,8 @@ public class GamePanel extends JPanel implements Runnable{
         activeTransitionType = TRANSITION_NONE;
         showTitleDuringTransition = false;
         transitionHoldTicks = 0;
+        disposeIntroCutscenePlayer();
+        pendingStartDialogue = null;
 
         tileM.loadMap(currentMapPath);
         currentMapConfig = tileM.getCurrentMapConfig();
@@ -1045,6 +1152,16 @@ public class GamePanel extends JPanel implements Runnable{
             return;
         }
 
+        if (gameState == introCutsceneState) {
+            if (introCutscenePlayer != null) {
+                introCutscenePlayer.draw(g2, screenWidth, screenHeight);
+            } else {
+                g2.setColor(Color.BLACK);
+                g2.fillRect(0, 0, screenWidth, screenHeight);
+            }
+            return;
+        }
+
         Graphics2D worldG = (Graphics2D) g2.create();
         worldG.translate(screenWidth / 2.0, screenHeight / 2.0);
         worldG.scale(cameraZoom, cameraZoom);
@@ -1126,6 +1243,9 @@ public class GamePanel extends JPanel implements Runnable{
         se.setVolume(masterVolume);
         player.setWalkingVolume(masterVolume);
         applyPhantomVoiceVolume();
+        if (introCutscenePlayer != null) {
+            introCutscenePlayer.setVolume(masterVolume);
+        }
         System.out.println("Volume: " + Math.round(masterVolume * 100) + "%");
     }
 

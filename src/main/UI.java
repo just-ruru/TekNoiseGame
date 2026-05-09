@@ -20,6 +20,7 @@ public class UI {
     private static final int TITLE_EXIT_COMMAND = 3;
     private static final int TITLE_BUTTON_WIDTH = 224;
     private static final int TITLE_BUTTON_HEIGHT = 56;
+    private static final int CHARACTER_COUNT = 4;
     private static final Font INTERACTION_PROMPT_FONT = new Font("Arial", Font.BOLD, 12);
     private static final long INTERACTION_PROMPT_DURATION_NS = 5_000_000_000L;
     private static final double INTERACTION_PROMPT_BOUNCE_SPEED = 5.5;
@@ -35,6 +36,19 @@ public class UI {
     private final Rectangle titleBackgroundBounds;
     private final BufferedImage[] titleButtonImages;
     private final Rectangle[] titleButtonBounds;
+    private final BufferedImage backButtonImage;
+    private final Rectangle backButtonBounds;
+    private final BufferedImage[] characterButtonImages;
+    private final BufferedImage[] characterButtonHoverImages;
+    private final Rectangle[] characterButtonBounds;
+    private final BufferedImage[][] characterDownFrames;
+    private final int[] characterDrawWidths;
+    private final int[] characterDrawHeights;
+    private final int[] characterAnchorXs;
+    private final Font characterSelectionTitleFont;
+    private int hoveredCharacterIndex = -1;
+    private int characterAnimationCounter = 0;
+    private int characterAnimationFrame = 0;
     private int activePromptObjectIndex = 999;
     private String activePromptText = null;
     private long activePromptExpiresAt = 0L;
@@ -68,6 +82,26 @@ public class UI {
                 loadTitleButtonImage(utilityTool, "/mainmenu/btnExit.png", "EXIT")
         };
         titleButtonBounds = createTitleButtonBounds();
+        backButtonImage = loadMenuImage("/mainmenu/btn_back.png");
+        backButtonBounds = createBackButtonBounds();
+        characterButtonImages = new BufferedImage[]{
+                loadMenuImage("/mainmenu/character_selection/llama.png"),
+                loadMenuImage("/mainmenu/character_selection/gasha.png"),
+                loadMenuImage("/mainmenu/character_selection/neil.png"),
+                loadMenuImage("/mainmenu/character_selection/romare.png")
+        };
+        characterButtonHoverImages = new BufferedImage[]{
+                loadMenuImage("/mainmenu/character_selection/llama_selected.png"),
+                loadMenuImage("/mainmenu/character_selection/gasha_selected.png"),
+                loadMenuImage("/mainmenu/character_selection/neil_selected.png"),
+                loadMenuImage("/mainmenu/character_selection/romare_selected.png")
+        };
+        characterButtonBounds = createCharacterButtonBounds();
+        characterDrawWidths = new int[]{25 * 3 + 12, 29 * 3 + 12, 25 * 3 + 12, 31 * 3 + 12};
+        characterDrawHeights = new int[]{40 * 3 + 18, 32 * 3 + 18, 41 * 3 + 18, 37 * 3 + 18};
+        characterAnchorXs = createCharacterAnchorXs();
+        characterDownFrames = loadCharacterDownFrames();
+        characterSelectionTitleFont = new Font("Monospaced", Font.BOLD, 36);
     }
 
     public void showMessage(String text) {
@@ -77,6 +111,7 @@ public class UI {
     public void update() {
         dialogueBox.update();
         updateInteractionPrompt();
+        updateCharacterSelectionAnimation();
     }
 
     public boolean isDialogueActive() {
@@ -94,6 +129,10 @@ public class UI {
 
         if (gp.shouldDrawTitleScreen()) {
             drawTitleScreen();
+        }
+
+        if (gp.gameState == gp.characterSelectState) {
+            drawCharacterSelectionScreen();
         }
 
         if (gp.gameState == gp.playState) {
@@ -167,7 +206,7 @@ public class UI {
     public void activateSelectedTitleCommand() {
         switch (commandNum) {
             case TITLE_START_COMMAND:
-                gp.startGameFromTitle();
+                gp.gameState = gp.characterSelectState;
                 break;
             case TITLE_LOAD_COMMAND:
             case TITLE_SETTINGS_COMMAND:
@@ -192,6 +231,37 @@ public class UI {
         }
 
         return -1;
+    }
+
+    public boolean updateCharacterHoverAt(int x, int y) {
+        if (gp.gameState != gp.characterSelectState) {
+            hoveredCharacterIndex = -1;
+            return false;
+        }
+
+        hoveredCharacterIndex = getCharacterButtonAt(x, y);
+        return hoveredCharacterIndex != -1 || backButtonBounds.contains(x, y);
+    }
+
+    public boolean handleCharacterSelectionClickAt(int x, int y) {
+        if (gp.gameState != gp.characterSelectState) {
+            return false;
+        }
+
+        if (backButtonBounds.contains(x, y)) {
+            gp.gameState = gp.titleState;
+            hoveredCharacterIndex = -1;
+            return true;
+        }
+
+        int buttonIndex = getCharacterButtonAt(x, y);
+        if (buttonIndex != -1) {
+            gp.startGameFromCharacterSelection(buttonIndex);
+            hoveredCharacterIndex = -1;
+            return true;
+        }
+
+        return false;
     }
 
     public void drawKeyInventory() { // CUSTOM METHOD by Llama -- gi himo ni nako para maapil og wagtang ang key UI text (in draw method) when game is paused
@@ -512,6 +582,172 @@ public class UI {
 
         String relativePath = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
         return readImageFromDisk(Paths.get("res").resolve(relativePath));
+    }
+
+    private Rectangle createBackButtonBounds() {
+        if (backButtonImage == null) {
+            int fallbackWidth = 64;
+            int fallbackHeight = 40;
+            int x = (gp.screenWidth - fallbackWidth) / 2;
+            int y = gp.screenHeight - (gp.tileSize + fallbackHeight);
+            return new Rectangle(x, y, fallbackWidth, fallbackHeight);
+        }
+        int width = backButtonImage.getWidth();
+        int height = backButtonImage.getHeight();
+        int x = (gp.screenWidth - width) / 2;
+        int y = gp.screenHeight - (gp.tileSize + height);
+        return new Rectangle(x, y, width, height);
+    }
+
+    private Rectangle[] createCharacterButtonBounds() {
+        Rectangle[] bounds = new Rectangle[CHARACTER_COUNT];
+        int buttonY = gp.screenHeight - (gp.tileSize * 3);
+        int centerY = buttonY + (TITLE_BUTTON_HEIGHT / 2);
+        int[] anchorXs = createCharacterAnchorXs();
+
+        for (int i = 0; i < CHARACTER_COUNT; i++) {
+            BufferedImage buttonImage = characterButtonImages[i];
+            int width = buttonImage != null ? buttonImage.getWidth() : TITLE_BUTTON_WIDTH;
+            int height = buttonImage != null ? buttonImage.getHeight() : TITLE_BUTTON_HEIGHT;
+            bounds[i] = new Rectangle(anchorXs[i] - (width / 2), centerY - (height / 2), width, height);
+        }
+
+        return bounds;
+    }
+
+    private int[] createCharacterAnchorXs() {
+        int[] anchors = new int[CHARACTER_COUNT];
+        int spacing = gp.screenWidth / (CHARACTER_COUNT + 1);
+        for (int i = 0; i < CHARACTER_COUNT; i++) {
+            anchors[i] = spacing * (i + 1);
+        }
+        return anchors;
+    }
+
+    private BufferedImage[][] loadCharacterDownFrames() {
+        BufferedImage[][] frames = new BufferedImage[CHARACTER_COUNT][4];
+
+        String[] characterFolders = {"Lerler", "Gasha", "Nnyl", "Gemal"};
+        String[] framePrefixes = {"cabo_down_", "gasha_down_", "rayos_down_", "gemal_down_"};
+
+        for (int i = 0; i < CHARACTER_COUNT; i++) {
+            for (int frame = 0; frame < 4; frame++) {
+                String imagePath = "/player/" + characterFolders[i] + "/Down/" + framePrefixes[i] + (frame + 1) + ".png";
+                frames[i][frame] = loadMenuImage(imagePath);
+            }
+        }
+
+        return frames;
+    }
+
+    private int getCharacterButtonAt(int x, int y) {
+        for (int i = 0; i < characterButtonBounds.length; i++) {
+            if (characterButtonBounds[i].contains(x, y)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private void updateCharacterSelectionAnimation() {
+        if (gp.gameState != gp.characterSelectState) {
+            characterAnimationCounter = 0;
+            characterAnimationFrame = 0;
+            return;
+        }
+
+        characterAnimationCounter++;
+        if (characterAnimationCounter > 12) {
+            characterAnimationCounter = 0;
+            characterAnimationFrame = (characterAnimationFrame + 1) % 4;
+        }
+    }
+
+    private void drawCharacterSelectionScreen() {
+        drawTitleBackgroundOnly();
+
+        Composite previousComposite = g2.getComposite();
+        Color previousColor = g2.getColor();
+        Font previousFont = g2.getFont();
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.45f));
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(new Color(250, 245, 220));
+        g2.setFont(characterSelectionTitleFont);
+        String title = "Choose your Character";
+        int titleX = getXforCenteredText(title);
+        int titleY = titleBackgroundBounds.y + gp.tileSize;
+        g2.drawString(title, titleX, titleY);
+
+        drawCharacterSprites();
+        drawCharacterButtons();
+        drawBackButton();
+
+        g2.setComposite(previousComposite);
+        g2.setColor(previousColor);
+        g2.setFont(previousFont);
+    }
+
+    private void drawCharacterSprites() {
+        int spriteCenterY = gp.screenHeight / 2;
+        for (int i = 0; i < CHARACTER_COUNT; i++) {
+            BufferedImage spriteImage = getCharacterDisplayFrame(i);
+            if (spriteImage == null) {
+                continue;
+            }
+
+            int drawWidth = characterDrawWidths[i];
+            int drawHeight = characterDrawHeights[i];
+            int buttonCenterX = characterButtonBounds[i].x + (characterButtonBounds[i].width / 2);
+            int drawX = buttonCenterX - (drawWidth / 2);
+            int drawY = spriteCenterY - (drawHeight / 2);
+            g2.drawImage(spriteImage, drawX, drawY, drawWidth, drawHeight, null);
+        }
+    }
+
+    private BufferedImage getCharacterDisplayFrame(int characterIndex) {
+        if (hoveredCharacterIndex == characterIndex) {
+            BufferedImage animatedFrame = characterDownFrames[characterIndex][characterAnimationFrame];
+            if (animatedFrame != null) {
+                return animatedFrame;
+            }
+        }
+        return characterDownFrames[characterIndex][0];
+    }
+
+    private void drawCharacterButtons() {
+        for (int i = 0; i < CHARACTER_COUNT; i++) {
+            boolean hovered = hoveredCharacterIndex == i;
+            BufferedImage image = hovered ? characterButtonHoverImages[i] : characterButtonImages[i];
+            if (image == null) {
+                continue;
+            }
+
+            Rectangle bounds = characterButtonBounds[i];
+            g2.drawImage(image, bounds.x, bounds.y, bounds.width, bounds.height, null);
+        }
+    }
+
+    private void drawBackButton() {
+        if (backButtonImage != null) {
+            g2.drawImage(backButtonImage, backButtonBounds.x, backButtonBounds.y, backButtonBounds.width, backButtonBounds.height, null);
+        }
+    }
+
+    private void drawTitleBackgroundOnly() {
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+        g2.drawImage(
+                titleBackground,
+                titleBackgroundBounds.x,
+                titleBackgroundBounds.y,
+                titleBackgroundBounds.width,
+                titleBackgroundBounds.height,
+                null
+        );
     }
 
     private BufferedImage readImageFromClasspath(String resourcePath) {
