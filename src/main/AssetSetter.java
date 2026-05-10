@@ -261,7 +261,7 @@ public class AssetSetter {
         gp.monster[0].stageY = gp.tileSize * 3;
 
         gp.monster[1] = new MON_Dementor(gp, 2);
-        gp.monster[1].stageX = gp.tileSize * 35;
+        gp.monster[1].stageX = gp.tileSize * 37;
         gp.monster[1].stageY = gp.tileSize * 6;
 
         gp.monster[2] = new MON_Dementor(gp, 3);
@@ -269,12 +269,8 @@ public class AssetSetter {
         gp.monster[2].stageY = gp.tileSize * 11;
 
         gp.monster[3] = new MON_Dementor(gp, 4);
-        gp.monster[3].stageX = gp.tileSize * 38;
-        gp.monster[3].stageY = gp.tileSize * 13;
-
-        gp.monster[4] = new MON_Dementor(gp, 1);
-        gp.monster[4].stageX = gp.tileSize * 24;
-        gp.monster[4].stageY = gp.tileSize * 9;
+        gp.monster[3].stageX = gp.tileSize * 24;
+        gp.monster[3].stageY = gp.tileSize * 9;
     }
 
     private void setStage02Monsters() {

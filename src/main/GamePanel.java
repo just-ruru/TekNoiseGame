@@ -14,6 +14,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.*;
+import java.util.prefs.Preferences;
 
 import main.MapConfig;
 
@@ -342,6 +343,30 @@ public class GamePanel extends JPanel implements Runnable{
         applyPhantomVoiceVolume();
         pendingStartDialogue = null;
         gameState = titleState;
+        playMusic(0);
+    }
+
+    public void saveCheckpoint() {
+        try {
+            Preferences prefs = Preferences.userNodeForPackage(GamePanel.class);
+            prefs.put("checkpointMap", currentMapPath);
+            prefs.putInt("characterChoice", choice);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void loadGameFromCheckpoint() {
+        try {
+            Preferences prefs = Preferences.userNodeForPackage(GamePanel.class);
+            String savedMap = prefs.get("checkpointMap", "/maps/stage01.txt");
+            int savedChoice = prefs.getInt("characterChoice", 1);
+            
+            prepareGameStart(savedChoice, savedMap);
+            beginTitleStartTransition();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     public void startGameThread(){
@@ -358,7 +383,7 @@ public class GamePanel extends JPanel implements Runnable{
             return;
         }
 
-        prepareGameStart(choice);
+        prepareGameStart(choice, "/maps/stage01.txt");
         beginTitleStartTransition();
     }
 
@@ -367,10 +392,11 @@ public class GamePanel extends JPanel implements Runnable{
             return;
         }
 
-        prepareGameStart(buttonIndex + 1);
+        prepareGameStart(buttonIndex + 1, "/maps/stage01.txt");
 
         introCutscenePlayer = new IntroCutscenePlayer(masterVolume, CHARACTER_INTRO_CUTSCENE_IDS[buttonIndex]);
         if (introCutscenePlayer.isAvailable()) {
+            stopMusic(); // Stop menu music when cutscene starts
             introCutscenePlayer.start();
             gameState = introCutsceneState;
             return;
@@ -380,14 +406,14 @@ public class GamePanel extends JPanel implements Runnable{
         beginTitleStartTransition();
     }
 
-    private void prepareGameStart(int selectedChoice) {
+    private void prepareGameStart(int selectedChoice, String mapPath) {
         choice = selectedChoice;
         player = new Player(this, keyH, choice);
         player.setWalkingVolume(masterVolume);
         keyH.interactPressed = false;
         keyH.sprintPressed = false;
 
-        currentMapPath = "/maps/stage01.txt";
+        currentMapPath = mapPath;
         nextMapPath = null;
         fadeAlpha = 0f;
         fadeOutPhase = true;
@@ -422,10 +448,17 @@ public class GamePanel extends JPanel implements Runnable{
         phantomVoice.setFile(6);
         phantomVoiceVolume = 0f;
         applyPhantomVoiceVolume();
-        pendingStartDialogue = "...\n\n"
-                + "Where am I?\n\n"
-                + "Why is it so dark?\n\n"
-                + "Where did everyone go?";
+        
+        if ("/maps/stage01.txt".equals(currentMapPath)) {
+            pendingStartDialogue = "...\n\n"
+                    + "Where am I?\n\n"
+                    + "Why is it so dark?\n\n"
+                    + "Where did everyone go?";
+        } else {
+            pendingStartDialogue = null;
+        }
+        
+        saveCheckpoint(); // Save new game / load checkpoint state immediately
     }
 
     private void beginTitleStartTransition() {
@@ -626,7 +659,9 @@ public class GamePanel extends JPanel implements Runnable{
         if (minionEffectTicks > 0) {
             vignette.setEnemyProximityLevel(1f);
             vignette.setEnemyFlickerLevel(1f);
-            updatePhantomVoice(phantomVoiceMaxVolume);
+            // DO NOT OVERRIDE THE MUSIC VOLUME IF THE PLAYER IS JUST IN THE MINION HIT EFFECT
+            // It was pushing phantom voice volume up which essentially mutes the music!
+            // updatePhantomVoice(phantomVoiceMaxVolume);
             return;
         }
 
@@ -662,22 +697,9 @@ public class GamePanel extends JPanel implements Runnable{
 
         vignette.setEnemyProximityLevel(enemyProximityLevel);
         vignette.setEnemyFlickerLevel(enemyFlickerLevel);
-        updatePhantomVoice(getPhantomVoiceTargetVolume(
-                playerIsNearEnemy,
-                nearestEnemyDistanceSquared,
-                triggerDistance));
-
-        if (monsterDimmingDialoguePending && !ui.isDialogueActive()) {
-            showMonsterDimmingDialogue();
-        }
-
-        if (playerIsNearEnemy && !monsterDimmingDialogueShown) {
-            if (ui.isDialogueActive()) {
-                monsterDimmingDialoguePending = true;
-            } else {
-                showMonsterDimmingDialogue();
-            }
-        }
+        
+        // Removed dynamic phantom voice update which was dynamically dimming (muting) the background music 
+        // when being near an enemy / damaged.
     }
 
     private float getPhantomVoiceTargetVolume(boolean playerIsNearEnemy, int nearestEnemyDistanceSquared, int triggerDistance) {
@@ -714,9 +736,8 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     private void applyMusicVolume() {
-        float phantomProgress = phantomVoiceMaxVolume == 0f ? 0f : Math.min(1f, phantomVoiceVolume / phantomVoiceMaxVolume);
-        float musicDucking = 1f - ((1f - musicVolumeDuringPhantomVoice) * phantomProgress);
-        music.setVolume(masterVolume * musicDucking);
+        // Disabled dynamic ducking to ensure music does not lower when getting damaged
+        music.setVolume(masterVolume);
     }
 
     private void showMonsterDimmingDialogue() {
@@ -790,6 +811,8 @@ public class GamePanel extends JPanel implements Runnable{
                 stage3BarrierBroken = false;
                 assetSetter.setObject(currentMapPath);
                 assetSetter.setMonster(currentMapPath);
+                
+                saveCheckpoint(); // Save whenever we reach a new stage
 
                 // now fade back in
                 fadeOutPhase = false;
@@ -1711,7 +1734,7 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void playMusic(int i) {
-
+        stopMusic();
         music.setFile(i);
         applyMusicVolume();
         music.play();

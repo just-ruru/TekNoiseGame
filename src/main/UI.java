@@ -44,7 +44,6 @@ public class UI {
     private final BufferedImage[][] characterDownFrames;
     private final int[] characterDrawWidths;
     private final int[] characterDrawHeights;
-    private final int[] characterAnchorXs;
     private final Font characterSelectionTitleFont;
     private int hoveredCharacterIndex = -1;
     private int characterAnimationCounter = 0;
@@ -106,7 +105,6 @@ public class UI {
         characterButtonBounds = createCharacterButtonBounds();
         characterDrawWidths = new int[]{25 * 3 + 12, 29 * 3 + 12, 25 * 3 + 12, 31 * 3 + 12};
         characterDrawHeights = new int[]{40 * 3 + 18, 32 * 3 + 18, 41 * 3 + 18, 37 * 3 + 18};
-        characterAnchorXs = createCharacterAnchorXs();
         characterDownFrames = loadCharacterDownFrames();
         characterSelectionTitleFont = new Font("Monospaced", Font.BOLD, 36);
 
@@ -247,11 +245,12 @@ public class UI {
     public void activateSelectedGameOverCommand() {
         if (commandNum == 0) {
             // Try Again
+            gp.playMusic(1);
             gp.retryCurrentMap();
         } else if (commandNum == 1) {
             // Back to Menu
             gp.gameState = gp.titleState;
-            gp.playMusic(1);
+            gp.playMusic(0);
         }
     }
 
@@ -314,6 +313,8 @@ public class UI {
                 gp.gameState = gp.characterSelectState;
                 break;
             case TITLE_LOAD_COMMAND:
+                gp.loadGameFromCheckpoint();
+                break;
             case TITLE_SETTINGS_COMMAND:
                 break;
             case TITLE_EXIT_COMMAND:

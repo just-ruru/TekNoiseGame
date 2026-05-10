@@ -28,25 +28,33 @@ public class Sound {
 
     public void setFile(int i) {
         try {
+            // Close any existing clip to prevent overlapping/memory leaks
+            if (clip != null) {
+                clip.stop();
+                clip.close();
+            }
+            
             AudioInputStream ais = AudioSystem.getAudioInputStream(soundURL[i]);
             clip = AudioSystem.getClip();
             clip.open(ais);
             applyVolume();
 
         }catch(Exception e) {
-
+            e.printStackTrace();
         }
     }
 
     public void play() {
 
         if (clip == null) return;
+        if (!clip.isOpen()) return;
         clip.start();
     }
 
     public void loop() {
 
         if (clip == null) return;
+        if (!clip.isOpen()) return;
         wasLooping = true;
         clip.loop(Clip.LOOP_CONTINUOUSLY);
     }
@@ -54,6 +62,8 @@ public class Sound {
     public void stop() {
         if (clip == null) return;
         clip.stop();
+        // Do NOT close the clip here, as it breaks re-playing (e.g., walking sound).
+        // Only close it when a NEW file is loaded in setFile().
         pausedFrame = 0;
         wasLooping = false;
     }
@@ -68,6 +78,7 @@ public class Sound {
 
     public void resume() {
         if (clip == null) return;
+        if (!clip.isOpen()) return;
 
         if (pausedFrame > 0) {
             clip.setFramePosition(pausedFrame);
@@ -89,6 +100,7 @@ public class Sound {
 
     private void applyVolume() {
         if (clip == null) return;
+        if (!clip.isOpen()) return;
         if (!clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) return;
 
         FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
