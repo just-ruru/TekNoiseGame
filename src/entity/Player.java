@@ -21,6 +21,7 @@ public class Player extends Entity{
     private static final int STAMINA_REGEN_TICKS_PER_POINT = 2;
     private static final int AXE_TABLE_COOLDOWN_TICKS = 120;
     private static final int AXE_DOOR_COOLDOWN_TICKS = 600;
+    private static final int POST_HIT_INTERACTION_DEFERRAL_TICKS = 8;
 
     GamePanel gp;
     KeyHandler keyH;
@@ -32,6 +33,8 @@ public class Player extends Entity{
     private int sprintCooldownTicksRemaining = 0;
     private int staminaRegenCounter = 0;
     private int controlsInvertedTicks = 0;
+    private int postHitInteractionDeferralTicks = 0;
+    private boolean bufferedInteractPressed = false;
 
     public final int screenX;
     public final int screenY;
@@ -77,6 +80,8 @@ public class Player extends Entity{
         hasAxe = false;
         axeTableCooldownTicks = 0;
         axeDoorCooldownTicks = 0;
+        postHitInteractionDeferralTicks = 0;
+        bufferedInteractPressed = false;
 
         //PLAYER STATUS
         maxLife = 5;
@@ -92,6 +97,12 @@ public class Player extends Entity{
         }
         
         if ("/maps/stage03.txt".equals(mapPath)) {
+            Point spawnMarker = gp.assetSetter.findMapMarker(mapPath, "Z");
+            if (spawnMarker != null) {
+                stageX = gp.tileSize * spawnMarker.x;
+                stageY = gp.tileSize * spawnMarker.y;
+                return;
+            }
             stageX = gp.tileSize * 3;
             stageY = gp.tileSize * 11;
             return;
@@ -215,8 +226,8 @@ public class Player extends Entity{
 
     public void update(){
         if (life <= 0) {
-            gp.gameState = gp.gameOverState;
-            gp.stopMusic();
+            walkingSound.stop();
+            gp.startGameOverSequence();
             return;
         }
     
@@ -240,6 +251,9 @@ public class Player extends Entity{
         }
         if (controlsInvertedTicks > 0) {
             controlsInvertedTicks--;
+        }
+        if (postHitInteractionDeferralTicks > 0) {
+            postHitInteractionDeferralTicks--;
         }
 
         boolean moving = keyH.isUpPressed || keyH.isDownPressed || keyH.isLeftPressed || keyH.isRightPressed;
@@ -326,8 +340,21 @@ public class Player extends Entity{
         }
 
 
+        boolean interactRequested = keyH.interactPressed || bufferedInteractPressed;
+        if (interactRequested && postHitInteractionDeferralTicks > 0) {
+            bufferedInteractPressed = true;
+            keyH.interactPressed = false;
+            interactRequested = false;
+        }
+
         // Allow interaction while standing still: press E when overlapping an object
-        if (keyH.interactPressed) {
+        if (interactRequested) {
+            bufferedInteractPressed = false;
+            keyH.interactPressed = true;
+            // Stage 3 barrier (XX) is a tile, not an object: show narrative prompt when facing it.
+            if (isStage("/maps/stage03.txt") && showStage3BarrierNarrationIfFacingIt()) {
+                keyH.interactPressed = false;
+            } else {
             // Prefer an interaction box in front of the player (so you don't need to be overlapping)
             int objIndex = gp.cChecker.checkObjectInFront(this, true, gp.tileSize / 2);
             if (objIndex == 999) {
@@ -335,6 +362,8 @@ public class Player extends Entity{
                 objIndex = gp.cChecker.checkObjectAtCurrentPosition(this, true);
             }
             pickUpObject(objIndex);
+            }
+            keyH.interactPressed = false;
         }
 
         if(invincible == true) {
@@ -349,6 +378,19 @@ public class Player extends Entity{
     public void pickUpObject(int i){
         if(i != 999){
             String objectName = gp.obj[i].name;
+            boolean suppressHeavyInteraction = gp.isPlayerInDamageCooldownWindow();
+
+            if (suppressHeavyInteraction
+                    && !"BreakableTable".equals(objectName)
+                    && !"DoorStage2".equals(objectName)
+                    && !"Axe".equals(objectName)
+                    && !"HealthBag".equals(objectName)
+                    && !"Key".equals(objectName)
+                    && !"DoorStage1".equals(objectName)
+                    && !"DoorStage3".equals(objectName)) {
+                keyH.interactPressed = false;
+                return;
+            }
 
             switch(objectName){
                 case "Switch":
@@ -418,6 +460,14 @@ public class Player extends Entity{
                     }
                     break;
 
+                case "HauntingEnergyHint":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        gp.ui.showMessage("There's a strange, haunting energy coming from the hallway on the right.\n\nI should go check it out.");
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+
                 case "DoorStage2":
                     if (keyH.interactPressed && interactCooldown == 0) {
                         objects.OBJ_DoorStage2 door = (objects.OBJ_DoorStage2) gp.obj[i];
@@ -432,11 +482,6 @@ public class Player extends Entity{
                         } else {
                             door.hitWithAxe();
                             axeDoorCooldownTicks = AXE_DOOR_COOLDOWN_TICKS;
-                            if (door.isOpenable()) {
-                                gp.ui.showMessage("The last plank breaks loose.\n\nThe door can open now.");
-                            } else {
-                                gp.ui.showMessage("You strike the planks with the axe.\n\nMore of the door is exposed.");
-                            }
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -460,7 +505,8 @@ public class Player extends Entity{
 
                 case "TablePaper":
                     if(keyH.interactPressed && interactCooldown == 0){
-                        gp.ui.showMessage(getTablePaperDialogue());
+                        objects.SuperObject paper = gp.obj[i];
+                        gp.ui.showMessage(getTablePaperDialogue(paper));
 
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -481,11 +527,12 @@ public class Player extends Entity{
                     gp.playSE(3);
                     hasAxe = true;
                     gp.obj[i] = null;
-                    gp.ui.showMessage("You picked up an axe.\n\nThis can break damaged tables and wooden planks.");
+                    gp.ui.showMessage("You found the axe!\n\n"
+                            + "I should try using this on that debris above that's blocking the room.\n\n"
+                            + "Press 'E' while facing breakable obstacles to use it.");
                     break;
 
                 case "BreakableTable":
-                case "CutsceneBreakable":
                     if (keyH.interactPressed && interactCooldown == 0) {
                         if (!hasAxe) {
                             gp.ui.showMessage("This table is cracked, but I cannot break it by hand.");
@@ -493,13 +540,30 @@ public class Player extends Entity{
                             gp.ui.showMessage("I need a moment before swinging the axe again.");
                         } else {
                             gp.playSE(3);
-                            int breakableRow = gp.obj[i].stageY / gp.tileSize;
+                            objects.SuperObject debris = gp.obj[i];
+                            int breakableRow = debris.stageY / gp.tileSize;
                             gp.obj[i] = null;
                             axeTableCooldownTicks = AXE_TABLE_COOLDOWN_TICKS;
-                            gp.ui.showMessage("You break the table apart with the axe.");
+                            // stage02.txt line 17 => row index 16 (0-based)
                             if (isStage("/maps/stage02.txt") && breakableRow == 16) {
                                 gp.triggerStage2BossIntroFromBreakable();
                             }
+                        }
+                        keyH.interactPressed = false;
+                        interactCooldown = 30;
+                    }
+                    break;
+                    
+                case "CutsceneBreakable":
+                    if (keyH.interactPressed && interactCooldown == 0) {
+                        if (!gp.isCandlePuzzleSolved()) {
+                            gp.ui.showMessage("The barricade doesn't budge.\n\n"
+                                    + "It feels like it's waiting for something.\n\n"
+                                    + "Those candles... I should solve that first.");
+                        } else {
+                            gp.ui.showMessage("The wood groans under my hand.\n\n"
+                                    + "Brute force won't do it.\n\n"
+                                    + "Something in this room is about to break it open.");
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -521,7 +585,8 @@ public class Player extends Entity{
 
                 case "Candle":
                     if (keyH.interactPressed && interactCooldown == 0) {
-                        gp.handleCandleInteraction((objects.OBJ_Candle) gp.obj[i]);
+                        objects.OBJ_Candle candle = (objects.OBJ_Candle) gp.obj[i];
+                        gp.handleCandleInteraction(candle);
                         keyH.interactPressed = false;
                         interactCooldown = 30;
                     }
@@ -532,13 +597,21 @@ public class Player extends Entity{
                         NPC_JhonPorkJerkyJake npc = (NPC_JhonPorkJerkyJake) gp.obj[i];
                         if (gp.isCandlePuzzleSolved()) {
                             gp.ui.showMessage("Jhon Pork Tocino: Thank you...\n\n"
-                                    + "The light is back.\n\n"
-                                    + "Jerky Jake and I can finally move on.");
+                                    + "The light is back. Jerky Jake and I can finally move on.\n\n"
+                                    + "Look into this room for the axe. It should help you break through the debris.\n\n"
+                                    + "Be careful... the 3-headed amalgamation is still out there.");
                             npc.startFade();
+                            gp.removeHauntingEnergyHints();
                         } else {
-                            gp.ui.showMessage("Jhon Pork Tocino: Please, help us bring the light back.\n\n"
-                                    + "Jerky Jake is trapped with me, and the phantoms are getting closer.\n\n"
-                                    + "Find the candle puzzle and light it correctly.");
+                            gp.ui.showMessage("Jhon Pork Tocino: Wait... you can see me?\n\n"
+                                    + "Don't panic. I'm Jhon Pork Tocino.\n\n"
+                                    + "I'm the one who wrote those notes.\n\n"
+                                    + "And yes... I already died in this place.\n\n"
+                                    + "I've been roaming for a long time.\n\n"
+                                    + "I found Jerky Jake fading into nothing, so I sealed him in this bottle to preserve him.\n\n"
+                                    + "The only way to strengthen him is light.\n\n"
+                                    + "Please solve the candle pattern and light all four in the correct order.");
+                            gp.removeHauntingEnergyHints();
                         }
                         keyH.interactPressed = false;
                         interactCooldown = 30;
@@ -559,6 +632,53 @@ public class Player extends Entity{
 
     private boolean mapExists(String mapPath) {
         return getClass().getResourceAsStream(mapPath) != null;
+    }
+    
+    private boolean showStage3BarrierNarrationIfFacingIt() {
+        int checkStageX = stageX;
+        int checkStageY = stageY;
+        int distance = gp.tileSize / 2;
+        
+        switch (direction) {
+            case "up":
+                checkStageY -= distance;
+                break;
+            case "down":
+                checkStageY += distance;
+                break;
+            case "left":
+                checkStageX -= distance;
+                break;
+            case "right":
+                checkStageX += distance;
+                break;
+            default:
+                break;
+        }
+        
+        int col = (checkStageX + solidArea.x + solidArea.width / 2) / gp.tileSize;
+        int row = (checkStageY + solidArea.y + solidArea.height / 2) / gp.tileSize;
+        if (col < 0 || row < 0 || col >= gp.maxStageCol || row >= gp.maxStageRow) {
+            return false;
+        }
+        
+        int tileNum = gp.getMapTileNumAt(col, row);
+        if (tileNum != tile.TileManager.STAGE3_BARRIER_TILE_ID) {
+            return false;
+        }
+        
+        if (!gp.isCandlePuzzleSolved()) {
+            gp.ui.showMessage("My hands slip against the barricade.\n\n"
+                    + "It isn't just wood.\n\n"
+                    + "This room won't let it go until I answer it.\n\n"
+                    + "Those candles... first.");
+        } else {
+            gp.ui.showMessage("The barricade trembles under my touch.\n\n"
+                    + "It's going to give way...\n\n"
+                    + "Just not by my choice.");
+        }
+        interactCooldown = 30;
+        return true;
     }
 
     private String getSwitchAlreadyOnDialogue() {
@@ -641,7 +761,7 @@ public class Player extends Entity{
         return "Locked.\n\nIf Jhon Pork was right, one of the orange drawer tables might have the key.";
     }
 
-    private String getTablePaperDialogue() {
+    private String getTablePaperDialogue(objects.SuperObject paper) {
         if(isStage("/maps/stage01.txt")){
             return "Name: Jhon Pork Tocino\n\n"
                     + "Most of the pages are smeared and torn.\n\n"
@@ -650,6 +770,8 @@ public class Player extends Entity{
                     + "\"I was a student, just like you. I pushed myself too far, fell asleep in class...\"\n\n"
                     + "\"When I woke up, this place was all that was left.\"\n\n"
                     + "\"There are shadow things wandering around here. If you see them, stay away.\"\n\n"
+                    + "\"Run when you have to, but do not burn yourself out.\"\n\n"
+                    + "\"Catch your breath before they corner you.\"\n\n"
                     + "\"Search the tables with drawers. People leave things behind. Sometimes useful things.\"\n\n"
                     + "\"I was trying to fix the light switch, but I lost my bag before I could finish.\"\n\n"
                     + "\"If you find it, maybe you can get the lights back on.\"\n\n"
@@ -659,7 +781,67 @@ public class Player extends Entity{
         }
 
         if (isStage("/maps/stage02.txt")) {
-            return "insert text here kyle";
+            int col = paper.stageX / gp.tileSize;
+            int row = paper.stageY / gp.tileSize;
+
+            // Riddle papers directly above each candle (guide: each candle has its own clue).
+            if (row == 44) {
+                if (col == 5) {
+                    return "Riddle Note I\n\n"
+                            + "\"I am the wake-up flame.\"\n\n"
+                            + "\"When darkness tests you, start with me.\"";
+                }
+                if (col == 16) {
+                    return "Riddle Note II\n\n"
+                            + "\"Do not skip ahead.\"\n\n"
+                            + "\"After the first breath of light, I answer second.\"";
+                }
+                if (col == 27) {
+                    return "Riddle Note III\n\n"
+                            + "\"I am never the opener, never the end.\"\n\n"
+                            + "\"Call me when two are already burning.\"";
+                }
+                if (col == 38) {
+                    return "Riddle Note IV\n\n"
+                            + "\"I seal the pattern.\"\n\n"
+                            + "\"Only when the first three stand should I burn.\"";
+                }
+            }
+
+            if (col == 4 && row == 18) {
+                return "Name: Jhon Pork Tocino\n\n"
+                        + "The letters are shaky and dragged across the page.\n\n"
+                        + "Ink has pooled where the hand must have stopped to breathe.\n\n"
+                        + "\"I entered the big room and found it waiting.\"\n\n"
+                        + "\"A three-headed amalgamation.\"\n\n"
+                        + "\"It sent minions to confuse me. I lost direction, then the other phantoms closed in.\"\n\n"
+                        + "\"I was surrounded. Badly wounded.\"\n\n"
+                        + "\"I crawled out and took shelter in the smaller room to the right, below the big room.\"\n\n"
+                        + "\"If you can still read this, follow that side.\"\n\n"
+                        + "\"I will keep leaving notes while my hand still moves.\"";
+            }
+
+            if (col == 13 && row == 27) {
+                return "Name: Jhon Pork Tocino\n\n"
+                        + "The note is smeared with dark fingerprints:\n\n"
+                        + "\"If this reaches you, I didn't make it out in time.\"\n\n"
+                        + "\"Jerky Jake is fading. I trapped him in a bottle so he won't disappear.\"\n\n"
+                        + "\"The room only gives strength through candlelight.\"\n\n"
+                        + "\"Find the right order. We need all four lit correctly.\"";
+            }
+
+            if (col == 38 && row == 31) {
+                return "Name: Jhon Pork Tocino\n\n"
+                        + "\"If you're reading this, you're close to our side of the room.\"\n\n"
+                        + "\"Once the candles answer, talk to me and Jerky Jake.\"\n\n"
+                        + "\"There's an axe hidden deeper inside.\"\n\n"
+                        + "\"Use it on the debris above that blocks the way to the exit door.\"";
+            }
+
+            // Fallback for any extra Stage 2 paper placements.
+            return "Name: Jhon Pork Tocino\n\n"
+                    + "\"Do not trust silence in this room.\"\n\n"
+                    + "\"Find every note. Each one leaves part of the pattern.\"";
         }
         if (isStage("/maps/stage03.txt")) {
             return "The page is water-damaged, but a sketch is still visible.\n\n"
@@ -684,6 +866,9 @@ public class Player extends Entity{
     }
 
     public void contactMonster(int i){
+        if (gp.ui != null && gp.ui.isDialogueActive()) {
+            return;
+        }
         if(i != 999){
             if (gp.monster[i] instanceof MON_MinionWitherSlime) {
                 ((MON_MinionWitherSlime) gp.monster[i]).hitPlayer();
@@ -693,15 +878,27 @@ public class Player extends Entity{
                 return;
             }
             if (gp.devSettings.isUnlimitedHealthEnabled()) {
+                if (!gp.consumePlayerDamageWindow()) {
+                    return;
+                }
                 life = maxLife;
                 return;
             }
             if(invincible == false) {
+                if (!gp.consumePlayerDamageWindow()) {
+                    return;
+                }
                 gp.playSE(7);
                 life -= 1;
                 invincible = true;
+                onDamageImpact();
             }
         }
+    }
+
+    public void onDamageImpact() {
+        postHitInteractionDeferralTicks = Math.max(postHitInteractionDeferralTicks, POST_HIT_INTERACTION_DEFERRAL_TICKS);
+        bufferedInteractPressed = false;
     }
 
     public void setWalkingVolume(float volume) {

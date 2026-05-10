@@ -4,7 +4,7 @@ import entity.Entity;
 import main.GamePanel;
 
 public class MON_MinionWitherSlime extends Entity {
-    private static final int LIFE_TICKS = 900;
+    private static final int LIFE_TICKS = 600;
     private static final int FADE_TICKS = 6;
     private int lifeTicks = LIFE_TICKS;
     private float alpha = 1f;
@@ -85,6 +85,9 @@ public class MON_MinionWitherSlime extends Entity {
 
     public void hitPlayer() {
         if (removeFromWorld) {
+            return;
+        }
+        if (gp.ui != null && gp.ui.isDialogueActive()) {
             return;
         }
         gp.playSE(7);

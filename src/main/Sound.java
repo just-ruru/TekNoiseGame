@@ -13,6 +13,7 @@ public class Sound {
     private int pausedFrame = 0;
     private boolean wasLooping = false;
     private float volume = 1f;
+    private int currentFileIndex = -1;
 
     public Sound() {
 
@@ -24,10 +25,15 @@ public class Sound {
         soundURL[5] = getClass().getResource("/sound/Walking.wav");
         soundURL[6] = getClass().getResource("/sound/phantomvoice.wav");
         soundURL[7] = getClass().getResource("/sound/damaged.wav");
+        soundURL[8] = getClass().getResource("/sound/chat.wav");
     }
 
     public void setFile(int i) {
         try {
+            if (i == currentFileIndex && clip != null && clip.isOpen()) {
+                applyVolume();
+                return;
+            }
             // Close any existing clip to prevent overlapping/memory leaks
             if (clip != null) {
                 clip.stop();
@@ -37,6 +43,7 @@ public class Sound {
             AudioInputStream ais = AudioSystem.getAudioInputStream(soundURL[i]);
             clip = AudioSystem.getClip();
             clip.open(ais);
+            currentFileIndex = i;
             applyVolume();
 
         }catch(Exception e) {
@@ -48,6 +55,14 @@ public class Sound {
 
         if (clip == null) return;
         if (!clip.isOpen()) return;
+        clip.start();
+    }
+
+    public void replay() {
+        if (clip == null) return;
+        if (!clip.isOpen()) return;
+        clip.stop();
+        clip.setFramePosition(0);
         clip.start();
     }
 
@@ -96,6 +111,10 @@ public class Sound {
 
     public float getVolume() {
         return volume;
+    }
+
+    public int getCurrentFileIndex() {
+        return currentFileIndex;
     }
 
     private void applyVolume() {

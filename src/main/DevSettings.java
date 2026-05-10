@@ -4,7 +4,7 @@ import java.awt.*;
 import java.awt.event.KeyEvent;
 
 public class DevSettings {
-    public static final boolean TEST_MODE = true;
+    private boolean testMode = true;
 
     private final GamePanel gp;
     private boolean open = false;
@@ -27,13 +27,29 @@ public class DevSettings {
         this.gp = gp;
     }
 
+    public void reset() {
+        phaseThroughWalls = false;
+        unlimitedHealth = false;
+        lightsOn = false;
+        axeMania = false;
+        selectedOption = 0;
+        selectedSpeedIndex = 0;
+        selectedStageIndex = 0;
+        open = false;
+    }
+
     public boolean handleKeyPressed(int code) {
-        if (!TEST_MODE) {
+        if (!testMode) {
             return false;
         }
 
         if (code == KeyEvent.VK_TAB) {
             open = !open;
+            return true;
+        }
+
+        if (code == KeyEvent.VK_ESCAPE && open) {
+            open = false;
             return true;
         }
 
@@ -108,15 +124,15 @@ public class DevSettings {
     }
 
     public boolean isOpen() {
-        return TEST_MODE && open;
+        return testMode && open;
     }
 
     public boolean isPhaseThroughWallsEnabled() {
-        return TEST_MODE && phaseThroughWalls;
+        return testMode && phaseThroughWalls;
     }
 
     public boolean isUnlimitedHealthEnabled() {
-        return TEST_MODE && unlimitedHealth;
+        return testMode && unlimitedHealth;
     }
 
     public float getPlayerBaseSpeed() {
@@ -127,10 +143,18 @@ public class DevSettings {
         if (isUnlimitedHealthEnabled()) {
             gp.player.life = gp.player.maxLife;
         }
-        if (TEST_MODE && axeMania) {
+        if (testMode && axeMania) {
             gp.player.hasAxe = true;
         }
-        gp.vignette.setDevRoomLightsOn(TEST_MODE && lightsOn);
+        gp.vignette.setDevRoomLightsOn(testMode && lightsOn);
+    }
+
+    public void setTestMode(boolean enabled) {
+        this.testMode = enabled;
+    }
+
+    public boolean isTestMode() {
+        return testMode;
     }
 
     public void draw(Graphics2D g2) {
@@ -169,7 +193,7 @@ public class DevSettings {
 
         g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
         g2.setColor(new Color(210, 210, 210));
-        g2.drawString("W/S: move   A/D: stage   Enter: toggle/apply   Tab: close", panelX + 24, panelY + panelH - 24);
+        g2.drawString("W/S: move   A/D: stage   Enter: toggle/apply   Tab/Esc: close", panelX + 24, panelY + panelH - 24);
 
         g2.setComposite(oldComposite);
         g2.setFont(oldFont);

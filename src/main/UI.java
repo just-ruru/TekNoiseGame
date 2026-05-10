@@ -25,6 +25,22 @@ public class UI {
     private static final long INTERACTION_PROMPT_DURATION_NS = 5_000_000_000L;
     private static final double INTERACTION_PROMPT_BOUNCE_SPEED = 5.5;
     private static final int INTERACTION_PROMPT_BOUNCE_HEIGHT = 4;
+    private static final String ENDING_PHANTOM_TEXT = "Tha Phantoms Will Be Back...";
+    private static final String[] ENDING_STATEMENT_LINES = {
+            "Academic success should never come-",
+            "at the cost of rest and well-being.",
+            "Take care of yourself while chasing what matters to you.",
+            "CREDITS",
+            "\"Project Manager & Prog. : Kyle Po as (Jhon Pork Tocino)\"",
+            "\"Art Director & Artist: Jake Din as (Jerky Jake)\"",
+            "\"Programmers: Cabo as (LlamaLer), Rayos as (Neil)\"",
+            "\"Artist: Gemal as (Rommare) \"",
+            "\"we hope you had fun playing our game\"",
+            "\"wami tulog ani\"",
+            "\"pero worth it\"",
+            "\"basta perfect /char\"",
+            "- TekNoise"
+    };
 
     GamePanel gp;
     Graphics2D g2;
@@ -45,13 +61,38 @@ public class UI {
     private final int[] characterDrawWidths;
     private final int[] characterDrawHeights;
     private final Font characterSelectionTitleFont;
+    private final Font endingPhantomFont;
+    private final Font endingStatementFont;
     private int hoveredCharacterIndex = -1;
+    private int characterSelectionIndex = 0;
     private int characterAnimationCounter = 0;
     private int characterAnimationFrame = 0;
     private int activePromptObjectIndex = 999;
     private String activePromptText = null;
     private long activePromptExpiresAt = 0L;
     public int commandNum = 0;
+
+    // Settings UI
+    private int settingsSelectedOption = 0;
+    public static final int SETTINGS_OPTION_DEVELOPER = 0;
+    public static final int SETTINGS_OPTION_VOLUME = 1;
+    public static final int SETTINGS_OPTION_BACK = 2;
+    private static final int SETTINGS_OPTION_COUNT = 3;
+
+    // Pause Menu UI
+    public int pauseSelectedOption = 0;
+    public static final int PAUSE_OPTION_RESUME = 0;
+    public static final int PAUSE_OPTION_SAVE = 1;
+    public static final int PAUSE_OPTION_QUIT = 2;
+    private static final int PAUSE_OPTION_COUNT = 3;
+
+    // Save Game UI
+    private static final String[] SAVE_SLOT_NAMES = {"Slot 1", "Slot 2", "Slot 3", "Slot 4", "Slot 5"};
+    private int saveGameSelectedIndex = 0;
+
+    // Load Game UI
+    private java.util.List<String> availableSaveFiles = new java.util.ArrayList<>();
+    private int loadGameSelectedIndex = 0;
 
     // Game Over images
     private BufferedImage gameOverTextImg;
@@ -107,6 +148,8 @@ public class UI {
         characterDrawHeights = new int[]{40 * 3 + 18, 32 * 3 + 18, 41 * 3 + 18, 37 * 3 + 18};
         characterDownFrames = loadCharacterDownFrames();
         characterSelectionTitleFont = new Font("Monospaced", Font.BOLD, 36);
+        endingPhantomFont = new Font("Monospaced", Font.BOLD, 28);
+        endingStatementFont = new Font("Monospaced", Font.BOLD, 22);
 
         // Load Game Over images
         gameOverTextImg = loadMenuImage("/gameover/YouDied.png");
@@ -161,6 +204,10 @@ public class UI {
         dialogueBox.advance();
     }
 
+    public void closeDialogue() {
+        dialogueBox.close();
+    }
+
     public void draw(Graphics2D g2) {
         this.g2 = g2;
         g2.setFont(arial_40);
@@ -168,6 +215,18 @@ public class UI {
 
         if (gp.shouldDrawTitleScreen()) {
             drawTitleScreen();
+        }
+
+        if (gp.gameState == gp.titleSettingsState) {
+            drawTitleSettingsScreen();
+        }
+
+        if (gp.gameState == gp.titleLoadState) {
+            drawTitleLoadScreen();
+        }
+
+        if (gp.gameState == gp.titleSaveState) {
+            drawTitleSaveScreen();
         }
 
         if (gp.gameState == gp.characterSelectState) {
@@ -179,6 +238,7 @@ public class UI {
                 drawPlayerLife();
                 drawStaminaBar();
                 drawAxeCooldown();
+                drawFirstEnemyHint();
             }
             drawKeyInventory();
             drawInteractionPrompt();
@@ -192,12 +252,26 @@ public class UI {
             drawGameOverScreen();
         }
 
+        if (gp.gameState == gp.endingState) {
+            drawEndingScreen();
+        }
+
+        if (gp.isHotkeyGuideVisible()) {
+            drawHotkeyGuide();
+        }
+
         dialogueBox.draw(g2);
         gp.devSettings.draw(g2);
     }
 
     public void drawGameOverScreen() {
-        g2.setColor(new Color(0, 0, 0, 150)); // semi-transparent black overlay
+        Composite oldComposite = g2.getComposite();
+        float overlayAlpha = gp.getGameOverOverlayAlpha();
+        float textAlpha = gp.getGameOverTextAlpha();
+        float buttonAlpha = gp.getGameOverButtonAlpha();
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, overlayAlpha * 0.60f));
+        g2.setColor(Color.BLACK);
         g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
 
         int textWidth = gameOverTextImg != null ? gameOverTextImg.getWidth() : 300;
@@ -206,16 +280,116 @@ public class UI {
         int textY = gp.screenHeight / 3 - textHeight / 2;
 
         if (gameOverTextImg != null) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, textAlpha));
             g2.drawImage(gameOverTextImg, textX, textY, null);
         } else {
             String text = "YOU DIED";
             int x = getXforCenteredText(text);
             int y = gp.screenHeight / 3;
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, textAlpha));
             g2.drawString(text, x, y);
         }
 
+        Graphics2D buttonG = (Graphics2D) g2.create();
+        buttonG.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, buttonAlpha));
+        Graphics2D oldG = this.g2;
+        this.g2 = buttonG;
         drawTitleButton(gameOverTryAgainImg, gameOverTryAgainBounds, commandNum == 0);
         drawTitleButton(gameOverBackToMenuImg, gameOverBackToMenuBounds, commandNum == 1);
+        this.g2 = oldG;
+        buttonG.dispose();
+        g2.setComposite(oldComposite);
+    }
+
+    private void drawEndingScreen() {
+        Composite oldComposite = g2.getComposite();
+        Color oldColor = g2.getColor();
+        Font oldFont = g2.getFont();
+
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+
+        float whiteAlpha = gp.getEndingWhiteAlpha();
+        if (whiteAlpha > 0f) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, whiteAlpha));
+            g2.setColor(Color.WHITE);
+            g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+        }
+
+        float phantomAlpha = gp.getEndingPhantomTextAlpha();
+        // If the white fade has begun, don't let the previous phantom text linger.
+        if (whiteAlpha > 0f) {
+            phantomAlpha = 0f;
+        }
+        if (phantomAlpha > 0f) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, phantomAlpha));
+            g2.setColor(Color.WHITE);
+            g2.setFont(endingPhantomFont);
+            drawCenteredLine(ENDING_PHANTOM_TEXT, gp.screenHeight / 2);
+        }
+
+        float statementAlpha = gp.getEndingStatementAlpha();
+        if (statementAlpha > 0f && gp.gameState == gp.endingState) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, statementAlpha));
+            g2.setColor(Color.BLACK);
+            g2.setFont(endingStatementFont);
+            int lineIndex = Math.max(0, Math.min(ENDING_STATEMENT_LINES.length - 1, gp.getEndingStatementLineIndex()));
+            if (lineIndex < ENDING_STATEMENT_LINES.length) {
+                drawCenteredLine(ENDING_STATEMENT_LINES[lineIndex], gp.screenHeight / 2);
+            }
+        }
+
+        g2.setComposite(oldComposite);
+        g2.setColor(oldColor);
+        g2.setFont(oldFont);
+    }
+
+    private void drawHotkeyGuide() {
+        Composite oldComposite = g2.getComposite();
+        Color oldColor = g2.getColor();
+        Font oldFont = g2.getFont();
+
+        int panelWidth = gp.screenWidth - (gp.tileSize * 4);
+        int panelHeight = gp.tileSize * 8;
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.88f));
+        g2.setColor(Color.BLACK);
+        g2.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 24));
+        g2.drawString("HOTKEY GUIDE", panelX + 24, panelY + 40);
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 18));
+        int textX = panelX + 28;
+        int y = panelY + 84;
+        int lineHeight = 28;
+
+        g2.drawString("W A S D  - Move", textX, y); y += lineHeight;
+        g2.drawString("E        - Interact / advance dialogue", textX, y); y += lineHeight;
+        g2.drawString("Shift    - Run", textX, y); y += lineHeight;
+        g2.drawString("P        - Pause", textX, y); y += lineHeight;
+        g2.drawString("F10      - Toggle this guide", textX, y); y += lineHeight;
+        g2.drawString("F11      - Toggle fullscreen", textX, y); y += lineHeight;
+        g2.drawString("+ / -    - Adjust volume", textX, y); y += lineHeight;
+        g2.drawString("Esc      - Skip intro cutscene", textX, y); y += lineHeight;
+        if (gp.devSettings.isTestMode()) {
+            g2.drawString("Tab      - Dev settings", textX, y);
+        }
+
+        g2.setColor(new Color(210, 210, 210));
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        g2.drawString("Press F10 again to close.", panelX + 24, panelY + panelHeight - 20);
+
+        g2.setComposite(oldComposite);
+        g2.setColor(oldColor);
+        g2.setFont(oldFont);
     }
 
     public void moveGameOverSelection(int delta) {
@@ -249,6 +423,7 @@ public class UI {
             gp.retryCurrentMap();
         } else if (commandNum == 1) {
             // Back to Menu
+            closeDialogue();
             gp.gameState = gp.titleState;
             gp.playMusic(0);
         }
@@ -272,16 +447,609 @@ public class UI {
         }
     }
 
+    public void drawTitleSettingsScreen() {
+        Composite oldComposite = g2.getComposite();
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+        g2.drawImage(
+                titleBackground,
+                titleBackgroundBounds.x,
+                titleBackgroundBounds.y,
+                titleBackgroundBounds.width,
+                titleBackgroundBounds.height,
+                null
+        );
+
+        int panelWidth = gp.screenWidth / 2;
+        int panelHeight = gp.tileSize * 8;
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
+        g2.setColor(Color.BLACK);
+        g2.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(3));
+        g2.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 28));
+        int titleX = (gp.screenWidth - g2.getFontMetrics().stringWidth("SETTINGS")) / 2;
+        g2.drawString("SETTINGS", titleX, panelY + 50);
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 20));
+        int optionY = panelY + 100;
+        int lineHeight = 50;
+
+        boolean devMode = gp.devSettings.isTestMode();
+        drawSettingsOption(SETTINGS_OPTION_DEVELOPER, "Developer Mode: " + (devMode ? "ON" : "OFF"), panelX, optionY);
+        optionY += lineHeight;
+
+        int volumePercent = gp.getMasterVolumePercent();
+        drawSettingsOption(SETTINGS_OPTION_VOLUME, "Volume: " + volumePercent + "%", panelX, optionY);
+        optionY += lineHeight;
+
+        drawSettingsOption(SETTINGS_OPTION_BACK, "Back", panelX, optionY);
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        g2.setColor(new Color(210, 210, 210));
+        g2.drawString("W/S: Select   Enter: Toggle   A/D: Adjust volume   Esc: Back", panelX + 24, panelY + panelHeight - 24);
+
+        g2.setComposite(oldComposite);
+        g2.setFont(oldFont);
+        g2.setColor(oldColor);
+    }
+
+    private void drawSettingsOption(int optionIndex, String text, int panelX, int y) {
+        g2.setColor(optionIndex == settingsSelectedOption ? new Color(255, 220, 120) : Color.WHITE);
+        String pointer = optionIndex == settingsSelectedOption ? "> " : "  ";
+        g2.drawString(pointer + text, panelX + 28, y);
+    }
+
+    public void moveSettingsSelection(int delta) {
+        settingsSelectedOption = Math.floorMod(settingsSelectedOption + delta, SETTINGS_OPTION_COUNT);
+    }
+
+    public int getSettingsSelectedOption() {
+        return settingsSelectedOption;
+    }
+
+    public void activateSelectedSettingsOption() {
+        switch (settingsSelectedOption) {
+            case SETTINGS_OPTION_DEVELOPER:
+                gp.devSettings.setTestMode(!gp.devSettings.isTestMode());
+                break;
+            case SETTINGS_OPTION_VOLUME:
+                gp.setMasterVolume(Math.min(1.0f, gp.getMasterVolumePercent() / 100f + 0.1f));
+                break;
+            case SETTINGS_OPTION_BACK:
+                closeDialogue();
+                gp.gameState = gp.titleState;
+                settingsSelectedOption = 0;
+                break;
+        }
+    }
+
+    public void increaseSettingsVolume() {
+        gp.increaseVolume();
+    }
+
+    public void decreaseSettingsVolume() {
+        gp.decreaseVolume();
+    }
+
+    public boolean handleSettingsClickAt(int x, int y) {
+        int panelWidth = gp.screenWidth / 2;
+        int panelHeight = gp.tileSize * 8;
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+        int optionY = panelY + 100;
+        int lineHeight = 50;
+
+        int optionHeight = 30;
+        int optionStartX = panelX + 28;
+        int optionEndX = panelX + panelWidth - 28;
+
+        for (int i = 0; i < SETTINGS_OPTION_COUNT; i++) {
+            int optionTop = optionY - 20;
+            int optionBottom = optionY + 10;
+            if (x >= optionStartX && x <= optionEndX && y >= optionTop && y <= optionBottom) {
+                settingsSelectedOption = i;
+                activateSelectedSettingsOption();
+                return true;
+            }
+            optionY += lineHeight;
+        }
+
+        return false;
+    }
+
+    public boolean selectSettingsOptionAt(int x, int y) {
+        int panelWidth = gp.screenWidth / 2;
+        int panelHeight = gp.tileSize * 8;
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+        int optionY = panelY + 100;
+        int lineHeight = 50;
+
+        int optionHeight = 30;
+        int optionStartX = panelX + 28;
+        int optionEndX = panelX + panelWidth - 28;
+
+        for (int i = 0; i < SETTINGS_OPTION_COUNT; i++) {
+            int optionTop = optionY - 20;
+            int optionBottom = optionY + 10;
+            if (x >= optionStartX && x <= optionEndX && y >= optionTop && y <= optionBottom) {
+                settingsSelectedOption = i;
+                return true;
+            }
+            optionY += lineHeight;
+        }
+
+        return false;
+    }
+
     public void drawPauseScreen() {
+        Composite oldComposite = g2.getComposite();
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(Color.WHITE);
+
         String text = "PAUSED";
         int x = getXforCenteredText(text);
-        int y = gp.screenHeight / 2;
+        int y = gp.screenHeight / 2 - 50;
+        g2.setFont(arial_40);
         g2.drawString(text, x, y);
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 20));
+        int optionY = gp.screenHeight / 2;
+        int lineHeight = 35;
+
+        drawPauseOption(PAUSE_OPTION_RESUME, "Resume", x, optionY);
+        optionY += lineHeight;
+        drawPauseOption(PAUSE_OPTION_SAVE, "Save Game", x, optionY);
+        optionY += lineHeight;
+        drawPauseOption(PAUSE_OPTION_QUIT, "Quit to Title", x, optionY);
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        g2.setColor(new Color(200, 200, 200));
+        String saveHint = "Press F5 to save game";
+        int saveX = getXforCenteredText(saveHint);
+        g2.drawString(saveHint, saveX, gp.screenHeight / 2 + 100);
+
+        g2.setComposite(oldComposite);
+        g2.setFont(oldFont);
+        g2.setColor(oldColor);
+    }
+
+    private void drawPauseOption(int optionIndex, String text, int x, int y) {
+        g2.setColor(optionIndex == pauseSelectedOption ? new Color(255, 220, 120) : Color.WHITE);
+        String pointer = optionIndex == pauseSelectedOption ? "> " : "  ";
+        g2.drawString(pointer + text, x - 100, y);
+    }
+
+    public void movePauseSelection(int delta) {
+        pauseSelectedOption = Math.max(0, Math.min(PAUSE_OPTION_COUNT - 1, pauseSelectedOption + delta));
+    }
+
+    public void activateSelectedPauseOption() {
+        switch (pauseSelectedOption) {
+            case PAUSE_OPTION_RESUME:
+                gp.gameState = gp.playState;
+                gp.resumeMusic();
+                break;
+            case PAUSE_OPTION_SAVE:
+                saveGameSelectedIndex = 0;
+                gp.gameState = gp.titleSaveState;
+                break;
+            case PAUSE_OPTION_QUIT:
+                closeDialogue();
+                gp.gameState = gp.titleState;
+                gp.playMusic(0);
+                break;
+        }
+    }
+
+    public void drawTitleLoadScreen() {
+        Composite oldComposite = g2.getComposite();
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+        g2.drawImage(
+                titleBackground,
+                titleBackgroundBounds.x,
+                titleBackgroundBounds.y,
+                titleBackgroundBounds.width,
+                titleBackgroundBounds.height,
+                null
+        );
+
+        if (availableSaveFiles.isEmpty()) {
+            g2.setFont(new Font("Monospaced", Font.BOLD, 32));
+            g2.setColor(Color.WHITE);
+            int textX = getXforCenteredText("No save files found");
+            int textY = gp.screenHeight / 2;
+            g2.drawString("No save files found", textX, textY);
+
+            g2.setFont(new Font("Monospaced", Font.PLAIN, 16));
+            g2.setColor(new Color(200, 200, 200));
+            String hint = "Press Esc to return";
+            int hintX = getXforCenteredText(hint);
+            g2.drawString(hint, hintX, textY + 50);
+
+            g2.setComposite(oldComposite);
+            g2.setFont(oldFont);
+            g2.setColor(oldColor);
+            return;
+        }
+
+        int panelWidth = gp.screenWidth / 2;
+        int panelHeight = gp.tileSize * 8;
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
+        g2.setColor(Color.BLACK);
+        g2.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(3));
+        g2.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 28));
+        int titleX = (gp.screenWidth - g2.getFontMetrics().stringWidth("LOAD GAME")) / 2;
+        g2.drawString("LOAD GAME", titleX, panelY + 50);
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 18));
+        int optionY = panelY + 100;
+        int lineHeight = 40;
+
+        for (int i = 0; i < availableSaveFiles.size() && i < 5; i++) {
+            String saveName = availableSaveFiles.get(i);
+            java.util.Map<String, String> info = gp.getSaveFileInfo(saveName);
+
+            String mapName = info.get("map");
+            if (mapName.contains("/")) {
+                String[] parts = mapName.split("/");
+                mapName = parts[parts.length - 1].replace(".txt", "");
+            }
+
+            String displayText = saveName + " - " + mapName;
+            drawLoadOption(i, displayText, panelX, optionY);
+            optionY += lineHeight;
+        }
+
+        if (availableSaveFiles.size() > 5) {
+            g2.setColor(new Color(180, 180, 180));
+            g2.drawString("... and " + (availableSaveFiles.size() - 5) + " more", panelX + 28, optionY);
+            optionY += lineHeight;
+        }
+
+        int backButtonIndex = Math.min(availableSaveFiles.size(), 5);
+        drawLoadOption(backButtonIndex, "Back", panelX, optionY + 20);
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        g2.setColor(new Color(210, 210, 210));
+        g2.drawString("W/S: Select   Enter: Load   Esc: Back", panelX + 24, panelY + panelHeight - 24);
+
+        g2.setComposite(oldComposite);
+        g2.setFont(oldFont);
+        g2.setColor(oldColor);
+    }
+
+    public void drawTitleSaveScreen() {
+        Composite oldComposite = g2.getComposite();
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+        g2.drawImage(
+                titleBackground,
+                titleBackgroundBounds.x,
+                titleBackgroundBounds.y,
+                titleBackgroundBounds.width,
+                titleBackgroundBounds.height,
+                null
+        );
+
+        int panelWidth = (int) (gp.screenWidth * 0.7f);
+        int panelHeight = gp.tileSize * 8;
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
+        g2.setColor(Color.BLACK);
+        g2.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(3));
+        g2.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 28));
+        int titleX = (gp.screenWidth - g2.getFontMetrics().stringWidth("SAVE GAME")) / 2;
+        g2.drawString("SAVE GAME", titleX, panelY + 50);
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 18));
+        int optionY = panelY + 100;
+        int lineHeight = 40;
+
+        // Draw save slots
+        for (int i = 0; i < SAVE_SLOT_NAMES.length; i++) {
+            String slotName = SAVE_SLOT_NAMES[i];
+            String saveFileName = "slot" + (i + 1);
+            
+            // Check if this slot has an existing save
+            java.util.Map<String, String> info = gp.getSaveFileInfo(saveFileName);
+            boolean hasSave = !info.isEmpty();
+            
+            String displayText = slotName;
+            if (hasSave) {
+                String mapName = info.get("map");
+                if (mapName != null && mapName.contains("/")) {
+                    String[] parts = mapName.split("/");
+                    mapName = parts[parts.length - 1].replace(".txt", "");
+                }
+                String timeStr = info.get("time");
+                if (timeStr != null) {
+                    long time = Long.parseLong(timeStr);
+                    java.util.Date date = new java.util.Date(time);
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, HH:mm");
+                    displayText += " - " + mapName + " (" + sdf.format(date) + ")";
+                } else {
+                    displayText += " - " + mapName;
+                }
+            } else {
+                displayText += " - Empty";
+            }
+            
+            drawSaveOption(i, displayText, panelX, optionY);
+            optionY += lineHeight;
+        }
+
+        // Back button
+        drawSaveOption(SAVE_SLOT_NAMES.length, "Back", panelX, optionY + 20);
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        g2.setColor(new Color(210, 210, 210));
+        g2.drawString("W/S: Select   Enter: Save   Esc: Back", panelX + 24, panelY + panelHeight - 24);
+
+        g2.setComposite(oldComposite);
+        g2.setFont(oldFont);
+        g2.setColor(oldColor);
+    }
+
+    private void drawSaveOption(int optionIndex, String text, int panelX, int y) {
+        g2.setColor(optionIndex == saveGameSelectedIndex ? new Color(255, 220, 120) : Color.WHITE);
+        String pointer = optionIndex == saveGameSelectedIndex ? "> " : "  ";
+        g2.drawString(pointer + text, panelX + 28, y);
+    }
+
+    public void moveSaveSelection(int delta) {
+        int maxIndex = SAVE_SLOT_NAMES.length; // + 1 for back button
+        saveGameSelectedIndex = Math.max(0, Math.min(maxIndex, saveGameSelectedIndex + delta));
+    }
+
+    public void activateSelectedSaveOption() {
+        if (saveGameSelectedIndex == SAVE_SLOT_NAMES.length) {
+            // Back button selected
+            gp.gameState = gp.pauseState;
+            return;
+        }
+
+        // Save to selected slot
+        String saveFileName = "slot" + (saveGameSelectedIndex + 1);
+        gp.saveGame(saveFileName);
+        gp.ui.showMessage("Game saved to " + SAVE_SLOT_NAMES[saveGameSelectedIndex] + "!");
+        gp.gameState = gp.pauseState;
+    }
+
+    private void drawLoadOption(int optionIndex, String text, int panelX, int y) {
+        g2.setColor(optionIndex == loadGameSelectedIndex ? new Color(255, 220, 120) : Color.WHITE);
+        String pointer = optionIndex == loadGameSelectedIndex ? "> " : "  ";
+        g2.drawString(pointer + text, panelX + 28, y);
+    }
+
+    public void moveLoadSelection(int delta) {
+        int backButtonIndex = Math.min(availableSaveFiles.size(), 5);
+        int maxIndex = backButtonIndex;
+        loadGameSelectedIndex = Math.max(0, Math.min(maxIndex, loadGameSelectedIndex + delta));
+    }
+
+    public void activateSelectedLoadOption() {
+        int backButtonIndex = Math.min(availableSaveFiles.size(), 5);
+        
+        if (loadGameSelectedIndex == backButtonIndex) {
+            // Back button selected
+            closeDialogue();
+            gp.gameState = gp.titleState;
+            return;
+        }
+
+        if (availableSaveFiles.isEmpty() || loadGameSelectedIndex >= availableSaveFiles.size()) {
+            closeDialogue();
+            gp.gameState = gp.titleState;
+            return;
+        }
+
+        String selectedSave = availableSaveFiles.get(loadGameSelectedIndex);
+        gp.loadGame(selectedSave);
+    }
+
+    public boolean handleLoadClickAt(int x, int y) {
+        if (gp.gameState != gp.titleLoadState) {
+            return false;
+        }
+
+        if (availableSaveFiles.isEmpty()) {
+            return false;
+        }
+
+        int panelWidth = gp.screenWidth / 2;
+        int panelHeight = gp.tileSize * 8;
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+        int optionY = panelY + 100;
+        int lineHeight = 40;
+
+        int optionHeight = 30;
+        int optionStartX = panelX + 28;
+        int optionEndX = panelX + panelWidth - 28;
+
+        // Check save file options
+        for (int i = 0; i < availableSaveFiles.size() && i < 5; i++) {
+            int optionTop = optionY - 20;
+            int optionBottom = optionY + 10;
+            if (x >= optionStartX && x <= optionEndX && y >= optionTop && y <= optionBottom) {
+                loadGameSelectedIndex = i;
+                activateSelectedLoadOption();
+                return true;
+            }
+            optionY += lineHeight;
+        }
+
+        // Check back button
+        int backButtonIndex = Math.min(availableSaveFiles.size(), 5);
+        int backOptionTop = optionY + 20 - 20;
+        int backOptionBottom = optionY + 20 + 10;
+        if (x >= optionStartX && x <= optionEndX && y >= backOptionTop && y <= backOptionBottom) {
+            loadGameSelectedIndex = backButtonIndex;
+            activateSelectedLoadOption();
+            return true;
+        }
+
+        return false;
+    }
+
+    public boolean selectLoadOptionAt(int x, int y) {
+        if (gp.gameState != gp.titleLoadState) {
+            return false;
+        }
+
+        if (availableSaveFiles.isEmpty()) {
+            return false;
+        }
+
+        int panelWidth = gp.screenWidth / 2;
+        int panelHeight = gp.tileSize * 8;
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+        int optionY = panelY + 100;
+        int lineHeight = 40;
+
+        int optionHeight = 30;
+        int optionStartX = panelX + 28;
+        int optionEndX = panelX + panelWidth - 28;
+
+        // Check save file options
+        for (int i = 0; i < availableSaveFiles.size() && i < 5; i++) {
+            int optionTop = optionY - 20;
+            int optionBottom = optionY + 10;
+            if (x >= optionStartX && x <= optionEndX && y >= optionTop && y <= optionBottom) {
+                loadGameSelectedIndex = i;
+                return true;
+            }
+            optionY += lineHeight;
+        }
+
+        // Check back button
+        int backButtonIndex = Math.min(availableSaveFiles.size(), 5);
+        int backOptionTop = optionY + 20 - 20;
+        int backOptionBottom = optionY + 20 + 10;
+        if (x >= optionStartX && x <= optionEndX && y >= backOptionTop && y <= backOptionBottom) {
+            loadGameSelectedIndex = backButtonIndex;
+            return true;
+        }
+
+        return false;
+    }
+
+    private void drawFirstEnemyHint() {
+        if (!gp.shouldShowFirstEnemyHint()) {
+            return;
+        }
+
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+        Composite oldComposite = g2.getComposite();
+
+        String[] lines = {
+                "Hint: Press Shift to Run",
+                "Hint: Take care of your stamina to avoid exhaustion"
+        };
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 14));
+        FontMetrics metrics = g2.getFontMetrics();
+        int maxWidth = 0;
+        for (String line : lines) {
+            maxWidth = Math.max(maxWidth, metrics.stringWidth(line));
+        }
+
+        int lineHeight = metrics.getHeight();
+        int textX = gp.screenWidth - maxWidth - 18;
+        int textY = gp.screenHeight - (gp.tileSize) - (lineHeight * lines.length) - 18 + metrics.getAscent();
+        float alpha = gp.getFirstEnemyHintAlpha();
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha * 0.55f));
+        g2.setColor(Color.BLACK);
+        int shadowY = textY;
+        for (String line : lines) {
+            g2.drawString(line, textX + 1, shadowY + 1);
+            shadowY += lineHeight;
+        }
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+        g2.setColor(new Color(248, 242, 225));
+        for (String line : lines) {
+            g2.drawString(line, textX, textY);
+            textY += lineHeight;
+        }
+
+        g2.setComposite(oldComposite);
+        g2.setColor(oldColor);
+        g2.setFont(oldFont);
     }
 
     public int getXforCenteredText(String text) {
         int length = (int) g2.getFontMetrics().getStringBounds(text, g2).getWidth();
         return gp.screenWidth / 2 - length / 2;
+    }
+
+    private void drawCenteredLine(String text, int centerY) {
+        FontMetrics metrics = g2.getFontMetrics();
+        int x = (gp.screenWidth - metrics.stringWidth(text)) / 2;
+        int y = centerY - (metrics.getHeight() / 2) + metrics.getAscent();
+        g2.drawString(text, x, y);
+    }
+
+    private void drawCenteredMultiline(String[] lines, int centerY, int lineSpacing) {
+        FontMetrics metrics = g2.getFontMetrics();
+        int totalHeight = (lines.length * metrics.getHeight()) + ((lines.length - 1) * lineSpacing);
+        int y = centerY - (totalHeight / 2) + metrics.getAscent();
+
+        for (String line : lines) {
+            int x = (gp.screenWidth - metrics.stringWidth(line)) / 2;
+            g2.drawString(line, x, y);
+            y += metrics.getHeight() + lineSpacing;
+        }
+    }
+
+    public int getEndingStatementLineCount() {
+        return ENDING_STATEMENT_LINES.length;
     }
 
     public void moveTitleSelection(int delta) {
@@ -313,9 +1081,13 @@ public class UI {
                 gp.gameState = gp.characterSelectState;
                 break;
             case TITLE_LOAD_COMMAND:
-                gp.loadGameFromCheckpoint();
+                availableSaveFiles = gp.getAvailableSaveFiles();
+                loadGameSelectedIndex = 0;
+                gp.gameState = gp.titleLoadState;
                 break;
             case TITLE_SETTINGS_COMMAND:
+                gp.gameState = gp.titleSettingsState;
+                settingsSelectedOption = 0;
                 break;
             case TITLE_EXIT_COMMAND:
                 gp.exitGame();
@@ -346,7 +1118,15 @@ public class UI {
         }
 
         hoveredCharacterIndex = getCharacterButtonAt(x, y);
-        return hoveredCharacterIndex != -1 || backButtonBounds.contains(x, y);
+        if (hoveredCharacterIndex != -1) {
+            characterSelectionIndex = hoveredCharacterIndex;
+            return true;
+        }
+        if (backButtonBounds.contains(x, y)) {
+            characterSelectionIndex = CHARACTER_COUNT;
+            return true;
+        }
+        return false;
     }
 
     public boolean handleCharacterSelectionClickAt(int x, int y) {
@@ -355,8 +1135,10 @@ public class UI {
         }
 
         if (backButtonBounds.contains(x, y)) {
+            closeDialogue();
             gp.gameState = gp.titleState;
             hoveredCharacterIndex = -1;
+            characterSelectionIndex = 0;
             return true;
         }
 
@@ -364,10 +1146,50 @@ public class UI {
         if (buttonIndex != -1) {
             gp.startGameFromCharacterSelection(buttonIndex);
             hoveredCharacterIndex = -1;
+            characterSelectionIndex = buttonIndex;
             return true;
         }
 
         return false;
+    }
+
+    public void moveCharacterSelection(int deltaX, int deltaY) {
+        if (gp.gameState != gp.characterSelectState) {
+            return;
+        }
+
+        hoveredCharacterIndex = -1;
+        if (deltaY > 0) {
+            characterSelectionIndex = CHARACTER_COUNT;
+            return;
+        }
+        if (deltaY < 0 && characterSelectionIndex == CHARACTER_COUNT) {
+            characterSelectionIndex = 0;
+            return;
+        }
+        if (characterSelectionIndex == CHARACTER_COUNT) {
+            return;
+        }
+        if (deltaX != 0) {
+            characterSelectionIndex = Math.floorMod(characterSelectionIndex + deltaX, CHARACTER_COUNT);
+        }
+    }
+
+    public void activateSelectedCharacterOption() {
+        if (gp.gameState != gp.characterSelectState) {
+            return;
+        }
+
+         if (characterSelectionIndex == CHARACTER_COUNT) {
+            closeDialogue();
+            gp.gameState = gp.titleState;
+            hoveredCharacterIndex = -1;
+            characterSelectionIndex = 0;
+            return;
+        }
+
+        gp.startGameFromCharacterSelection(characterSelectionIndex);
+        hoveredCharacterIndex = -1;
     }
 
     public void drawKeyInventory() { // CUSTOM METHOD by Llama -- gi himo ni nako para maapil og wagtang ang key UI text (in draw method) when game is paused
@@ -648,8 +1470,9 @@ public class UI {
             case "DoorStage2":
                 return gp.player.hasAxe ? "Press E to break" : "Press E to inspect";
             case "BreakableTable":
-            case "CutsceneBreakable":
                 return gp.player.hasAxe ? "Press E to break" : "Press E to inspect";
+            case "CutsceneBreakable":
+                return "Press E to inspect";
             case "HealthBag":
                 return "Press E to use";
             case "Candle":
@@ -760,6 +1583,7 @@ public class UI {
         if (gp.gameState != gp.characterSelectState) {
             characterAnimationCounter = 0;
             characterAnimationFrame = 0;
+            characterSelectionIndex = 0;
             return;
         }
 
@@ -816,7 +1640,7 @@ public class UI {
     }
 
     private BufferedImage getCharacterDisplayFrame(int characterIndex) {
-        if (hoveredCharacterIndex == characterIndex) {
+        if (hoveredCharacterIndex == characterIndex || characterSelectionIndex == characterIndex) {
             BufferedImage animatedFrame = characterDownFrames[characterIndex][characterAnimationFrame];
             if (animatedFrame != null) {
                 return animatedFrame;
@@ -827,7 +1651,7 @@ public class UI {
 
     private void drawCharacterButtons() {
         for (int i = 0; i < CHARACTER_COUNT; i++) {
-            boolean hovered = hoveredCharacterIndex == i;
+            boolean hovered = hoveredCharacterIndex == i || characterSelectionIndex == i;
             BufferedImage image = hovered ? characterButtonHoverImages[i] : characterButtonImages[i];
             if (image == null) {
                 continue;
@@ -840,6 +1664,17 @@ public class UI {
 
     private void drawBackButton() {
         if (backButtonImage != null) {
+            if (characterSelectionIndex == CHARACTER_COUNT) {
+                Graphics2D backG = (Graphics2D) g2.create();
+                backG.setColor(new Color(255, 255, 255, 48));
+                backG.fillRoundRect(backButtonBounds.x - 10, backButtonBounds.y - 8,
+                        backButtonBounds.width + 20, backButtonBounds.height + 16, 18, 18);
+                backG.setColor(new Color(255, 233, 164, 230));
+                backG.setStroke(new BasicStroke(3f));
+                backG.drawRoundRect(backButtonBounds.x - 10, backButtonBounds.y - 8,
+                        backButtonBounds.width + 20, backButtonBounds.height + 16, 18, 18);
+                backG.dispose();
+            }
             g2.drawImage(backButtonImage, backButtonBounds.x, backButtonBounds.y, backButtonBounds.width, backButtonBounds.height, null);
         }
     }

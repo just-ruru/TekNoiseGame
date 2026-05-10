@@ -47,6 +47,19 @@ public class VignetteLight {
     private final int screenH;
     private final java.util.Random rand = new java.util.Random();
     private final BufferedImage overlay;
+    private final Color[] blackAlphaCache = new Color[256];
+    private RadialGradientPaint cachedLightPaint;
+    private int cachedLightCx = Integer.MIN_VALUE;
+    private int cachedLightCy = Integer.MIN_VALUE;
+    private int cachedLightRadius = Integer.MIN_VALUE;
+    private RadialGradientPaint cachedGlowPaint;
+    private int cachedGlowCx = Integer.MIN_VALUE;
+    private int cachedGlowCy = Integer.MIN_VALUE;
+    private int cachedGlowRadius = Integer.MIN_VALUE;
+    private int cachedGlowColorR = -1;
+    private int cachedGlowColorG = -1;
+    private int cachedGlowColorB = -1;
+    private int cachedGlowColorA = -1;
 
     public VignetteLight(int screenWidth, int screenHeight) {
         this.screenW = screenWidth;
@@ -89,11 +102,7 @@ public class VignetteLight {
             }
         }
 
-        og.setColor(new Color(
-                darkColor.getRed(),
-                darkColor.getGreen(),
-                darkColor.getBlue(),
-                Math.round(currentDarkness * 255)));
+        og.setColor(getBlackAlphaColor(Math.round(currentDarkness * 255)));
         og.fillRect(0, 0, screenW, screenH);
 
         int radiusToDraw = currentRadius;
@@ -148,6 +157,28 @@ public class VignetteLight {
         return lightsActivated;
     }
 
+    public void reset() {
+        roomLight = lightsActivated;
+        flickerEnabled = true;
+        enemyDimTarget = 0f;
+        enemyDimProgress = 0f;
+        enemyFlickerTarget = 0f;
+        enemyFlickerProgress = 0f;
+        currentRadius = lightRadius;
+        flickerTimer = 0;
+        isFlickering = false;
+        flickerOffset = 0;
+        darkness = 0.9f;
+        brokenRoomLightDarkness = 0.4f;
+        roomLightEnemyDarkness = 0.8f;
+    }
+
+    public void fullReset() {
+        roomLight = false;
+        lightsActivated = false;
+        reset();
+    }
+
     public void triggerEnemyProximityDim() {
         setEnemyProximityLevel(1f);
     }
@@ -179,6 +210,7 @@ public class VignetteLight {
 
     public void setGlowColor(Color c) {
         this.glowColor = c;
+        invalidateGlowPaintCache();
     }
 
     public void setFlicker(boolean enabled) {
@@ -257,31 +289,77 @@ public class VignetteLight {
     }
 
     private void drawLightCircle(Graphics2D g, int cx, int cy, int radius) {
-        RadialGradientPaint rgp = new RadialGradientPaint(
-                new Point(cx, cy),
-                radius,
-                new float[]{0.0f, 0.65f, 1.0f},
-                new Color[]{
-                        new Color(0, 0, 0, 255),
-                        new Color(0, 0, 0, 220),
-                        new Color(0, 0, 0, 0)
-                });
-        g.setPaint(rgp);
+        if (cachedLightPaint == null || cachedLightCx != cx || cachedLightCy != cy || cachedLightRadius != radius) {
+            cachedLightPaint = new RadialGradientPaint(
+                    new Point(cx, cy),
+                    radius,
+                    new float[]{0.0f, 0.65f, 1.0f},
+                    new Color[]{
+                            new Color(0, 0, 0, 255),
+                            new Color(0, 0, 0, 220),
+                            new Color(0, 0, 0, 0)
+                    });
+            cachedLightCx = cx;
+            cachedLightCy = cy;
+            cachedLightRadius = radius;
+        }
+        g.setPaint(cachedLightPaint);
         g.fillOval(cx - radius, cy - radius, radius * 2, radius * 2);
     }
 
     private void drawGlowRing(Graphics2D g, int cx, int cy, int radius) {
         int glowRadius = (int) (radius * 1.15f);
-        RadialGradientPaint glow = new RadialGradientPaint(
-                new Point(cx, cy),
-                glowRadius,
-                new float[]{0.0f, 0.55f, 1.0f},
-                new Color[]{
-                        new Color(glowColor.getRed(), glowColor.getGreen(), glowColor.getBlue(), 0),
-                        new Color(glowColor.getRed(), glowColor.getGreen(), glowColor.getBlue(), glowColor.getAlpha() / 2),
-                        new Color(glowColor.getRed(), glowColor.getGreen(), glowColor.getBlue(), 0)
-                });
-        g.setPaint(glow);
+        int r = glowColor.getRed();
+        int gc = glowColor.getGreen();
+        int b = glowColor.getBlue();
+        int a = glowColor.getAlpha();
+        if (cachedGlowPaint == null
+                || cachedGlowCx != cx
+                || cachedGlowCy != cy
+                || cachedGlowRadius != glowRadius
+                || cachedGlowColorR != r
+                || cachedGlowColorG != gc
+                || cachedGlowColorB != b
+                || cachedGlowColorA != a) {
+            cachedGlowPaint = new RadialGradientPaint(
+                    new Point(cx, cy),
+                    glowRadius,
+                    new float[]{0.0f, 0.55f, 1.0f},
+                    new Color[]{
+                            new Color(r, gc, b, 0),
+                            new Color(r, gc, b, a / 2),
+                            new Color(r, gc, b, 0)
+                    });
+            cachedGlowCx = cx;
+            cachedGlowCy = cy;
+            cachedGlowRadius = glowRadius;
+            cachedGlowColorR = r;
+            cachedGlowColorG = gc;
+            cachedGlowColorB = b;
+            cachedGlowColorA = a;
+        }
+        g.setPaint(cachedGlowPaint);
         g.fillOval(cx - glowRadius, cy - glowRadius, glowRadius * 2, glowRadius * 2);
+    }
+
+    private Color getBlackAlphaColor(int alpha) {
+        int clampedAlpha = Math.max(0, Math.min(255, alpha));
+        Color cached = blackAlphaCache[clampedAlpha];
+        if (cached == null) {
+            cached = new Color(0, 0, 0, clampedAlpha);
+            blackAlphaCache[clampedAlpha] = cached;
+        }
+        return cached;
+    }
+
+    private void invalidateGlowPaintCache() {
+        cachedGlowPaint = null;
+        cachedGlowCx = Integer.MIN_VALUE;
+        cachedGlowCy = Integer.MIN_VALUE;
+        cachedGlowRadius = Integer.MIN_VALUE;
+        cachedGlowColorR = -1;
+        cachedGlowColorG = -1;
+        cachedGlowColorB = -1;
+        cachedGlowColorA = -1;
     }
 }

@@ -42,6 +42,18 @@ public class Entity {
     private String avoidedDirection = null;
     private int avoidedDirectionTicks = 0;
     private static final int AVOID_BLOCKED_DIRECTION_TICKS = 24;
+    
+    // Fade-in support (used for stage 3 chase summons).
+    private int fadeInTicksTotal = 0;
+    private int fadeInTicksRemaining = 0;
+    private static final int MAX_PATH_SEARCH_STEPS = 4096;
+
+    private boolean[][] pathClosed;
+    private int[][] pathCostSoFar;
+    private String[][] pathFirstDirection;
+    private final PriorityQueue<PathNode> pathFrontier = new PriorityQueue<>((a, b) -> Integer.compare(a.priority, b.priority));
+    private final java.util.ArrayList<PathNode> usedPathNodes = new java.util.ArrayList<>();
+    private final java.util.ArrayDeque<PathNode> pathNodePool = new java.util.ArrayDeque<>();
 
     public Entity(GamePanel gp) {
         this.gp = gp;
@@ -75,17 +87,31 @@ public class Entity {
 
         collisionOn = false;
         gp.cChecker.checkTile(this);
-        gp.cChecker.checkEntity(this, gp.monster);
+        // Stage 3 chase can spawn many enemies; skip enemy-enemy collision there
+        // to avoid O(n^2) collision cost spikes while preserving tile/player collision.
+        if (!(type == 1 && gp.isStage3ChaseStarted())) {
+            gp.cChecker.checkEntity(this, gp.monster);
+        }
         boolean contactPlayer = gp.cChecker.checkPlayer(this);
 
         if(this.type == 1 && contactPlayer == true) {
+            if (gp.ui != null && gp.ui.isDialogueActive()) {
+                return;
+            }
             if (gp.devSettings.isUnlimitedHealthEnabled()) {
+                if (!gp.consumePlayerDamageWindow()) {
+                    return;
+                }
                 gp.player.life = gp.player.maxLife;
             } else if(gp.player.invincible == false) {
+                if (!gp.consumePlayerDamageWindow()) {
+                    return;
+                }
                 gp.playSE(7);
                 //we can give damage
                 gp.player.life -= 1;
                 gp.player.invincible = true;
+                gp.player.onDamageImpact();
             }
         }
         if(collisionOn == false) {
@@ -113,6 +139,7 @@ public class Entity {
     }
 
     public void updateAnimationOnly() {
+        updateFadeIn();
         spriteCounter++;
         if(spriteCounter > 12){
             if(spriteNum == 1){
@@ -125,6 +152,28 @@ public class Entity {
                 spriteNum = 1;
             }
             spriteCounter = 0;
+        }
+    }
+    
+    public void startFadeIn(int ticks) {
+        fadeInTicksTotal = Math.max(0, ticks);
+        fadeInTicksRemaining = fadeInTicksTotal;
+    }
+    
+    public float getDrawAlpha() {
+        if (fadeInTicksTotal <= 0) {
+            return 1f;
+        }
+        if (fadeInTicksRemaining <= 0) {
+            return 1f;
+        }
+        float progress = 1f - ((float) fadeInTicksRemaining / (float) fadeInTicksTotal);
+        return Math.max(0f, Math.min(1f, progress));
+    }
+    
+    private void updateFadeIn() {
+        if (fadeInTicksRemaining > 0) {
+            fadeInTicksRemaining--;
         }
     }
 
@@ -276,33 +325,32 @@ public class Entity {
 
         int cols = gp.maxStageCol;
         int rows = gp.maxStageRow;
-        boolean[][] closed = new boolean[cols][rows];
-        int[][] costSoFar = new int[cols][rows];
-        String[][] firstDirection = new String[cols][rows];
-        PriorityQueue<int[]> frontier = new PriorityQueue<>((a, b) -> Integer.compare(a[2], b[2]));
+        ensurePathBuffers(cols, rows);
+        resetPathBuffers(cols, rows);
+        pathFrontier.clear();
+        recycleUsedPathNodes();
 
-        for (int col = 0; col < cols; col++) {
-            for (int row = 0; row < rows; row++) {
-                costSoFar[col][row] = Integer.MAX_VALUE;
-            }
-        }
-
-        costSoFar[startCol][startRow] = 0;
-        frontier.add(new int[] {startCol, startRow, heuristic(startCol, startRow, targetCol, targetRow)});
+        pathCostSoFar[startCol][startRow] = 0;
+        addPathNode(startCol, startRow, heuristic(startCol, startRow, targetCol, targetRow));
 
         int[] dCol = {0, 0, -1, 1};
         int[] dRow = {-1, 1, 0, 0};
         String[] directionNames = {"up", "down", "left", "right"};
 
-        while (!frontier.isEmpty()) {
-            int[] current = frontier.poll();
-            int currentCol = current[0];
-            int currentRow = current[1];
+        int searchSteps = 0;
+        while (!pathFrontier.isEmpty()) {
+            PathNode current = pathFrontier.poll();
+            int currentCol = current.col;
+            int currentRow = current.row;
 
-            if (closed[currentCol][currentRow]) {
+            if (pathClosed[currentCol][currentRow]) {
                 continue;
             }
-            closed[currentCol][currentRow] = true;
+            pathClosed[currentCol][currentRow] = true;
+            searchSteps++;
+            if (searchSteps > MAX_PATH_SEARCH_STEPS) {
+                break;
+            }
 
             sortDirectionsByHeuristic(dCol, dRow, directionNames, currentCol, currentRow, targetCol, targetRow);
 
@@ -321,30 +369,73 @@ public class Entity {
                 if (nextCol < 0 || nextRow < 0 || nextCol >= cols || nextRow >= rows) {
                     continue;
                 }
-                if (closed[nextCol][nextRow] || gp.isPathTileBlocked(nextCol, nextRow)) {
+                if (pathClosed[nextCol][nextRow] || gp.isPathTileBlocked(nextCol, nextRow)) {
                     continue;
                 }
 
-                int newCost = costSoFar[currentCol][currentRow] + 1;
-                if (newCost >= costSoFar[nextCol][nextRow]) {
+                int newCost = pathCostSoFar[currentCol][currentRow] + 1;
+                if (newCost >= pathCostSoFar[nextCol][nextRow]) {
                     continue;
                 }
 
-                costSoFar[nextCol][nextRow] = newCost;
-                firstDirection[nextCol][nextRow] = firstDirection[currentCol][currentRow] != null
-                        ? firstDirection[currentCol][currentRow]
+                pathCostSoFar[nextCol][nextRow] = newCost;
+                pathFirstDirection[nextCol][nextRow] = pathFirstDirection[currentCol][currentRow] != null
+                        ? pathFirstDirection[currentCol][currentRow]
                         : directionNames[i];
 
                 if (nextCol == targetCol && nextRow == targetRow) {
-                    return firstDirection[nextCol][nextRow];
+                    return pathFirstDirection[nextCol][nextRow];
                 }
 
                 int priority = newCost + heuristic(nextCol, nextRow, targetCol, targetRow);
-                frontier.add(new int[] {nextCol, nextRow, priority});
+                addPathNode(nextCol, nextRow, priority);
             }
         }
 
         return null;
+    }
+
+    private void ensurePathBuffers(int cols, int rows) {
+        if (pathClosed == null || pathClosed.length != cols || pathClosed[0].length != rows) {
+            pathClosed = new boolean[cols][rows];
+            pathCostSoFar = new int[cols][rows];
+            pathFirstDirection = new String[cols][rows];
+        }
+    }
+
+    private void resetPathBuffers(int cols, int rows) {
+        for (int col = 0; col < cols; col++) {
+            for (int row = 0; row < rows; row++) {
+                pathClosed[col][row] = false;
+                pathCostSoFar[col][row] = Integer.MAX_VALUE;
+                pathFirstDirection[col][row] = null;
+            }
+        }
+    }
+
+    private void addPathNode(int col, int row, int priority) {
+        PathNode node = pathNodePool.pollFirst();
+        if (node == null) {
+            node = new PathNode();
+        }
+        node.col = col;
+        node.row = row;
+        node.priority = priority;
+        usedPathNodes.add(node);
+        pathFrontier.add(node);
+    }
+
+    private void recycleUsedPathNodes() {
+        for (int i = 0; i < usedPathNodes.size(); i++) {
+            pathNodePool.addLast(usedPathNodes.get(i));
+        }
+        usedPathNodes.clear();
+    }
+
+    private static class PathNode {
+        int col;
+        int row;
+        int priority;
     }
 
     private int[] findNearestOpenPathTile(int centerCol, int centerRow) {
@@ -457,7 +548,13 @@ public class Entity {
             }
 
             if (image != null) {
+                Composite oldComposite = g2.getComposite();
+                float alpha = getDrawAlpha();
+                if (alpha < 1f) {
+                    g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
+                }
                 g2.drawImage(image, screenX, screenY, gp.tileSize, gp.tileSize, null);
+                g2.setComposite(oldComposite);
             }
         }
     }

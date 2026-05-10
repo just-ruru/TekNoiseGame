@@ -10,10 +10,12 @@ public class DialogueBox {
     private final GamePanel gp;
     private final Font pixelFont;
     private final List<String> pages = new ArrayList<>();
+    private final Sound chatSound;
 
     private boolean active = false;
     private int pageIndex = 0;
     private int visibleChars = 0;
+    private int chatSoundCooldown = 0;
 
     // Text reveal speed in characters per frame.
     private final int charsPerFrame = 1;
@@ -21,12 +23,17 @@ public class DialogueBox {
     public DialogueBox(GamePanel gp) {
         this.gp = gp;
         this.pixelFont = new Font("Monospaced", Font.BOLD, 24);
+        this.chatSound = new Sound();
+        this.chatSound.setFile(8);
+        this.chatSound.setVolume(gp != null ? gp.getMasterVolumePercent() / 100f : 1f);
     }
 
     public void show(String text) {
         pages.clear();
         pageIndex = 0;
         visibleChars = 0;
+        chatSoundCooldown = 0;
+        chatSound.stop();
 
         if (text == null || text.isBlank()) {
             active = false;
@@ -43,10 +50,24 @@ public class DialogueBox {
     }
 
     public void update() {
-        if (!active || pages.isEmpty()) return;
+        if (!active || pages.isEmpty()) {
+            chatSound.stop();
+            return;
+        }
+        chatSound.setVolume(gp.getMasterVolumePercent() / 100f);
+        if (chatSoundCooldown > 0) {
+            chatSoundCooldown--;
+        }
         String currentPage = pages.get(pageIndex);
         if (visibleChars < currentPage.length()) {
+            int previousVisibleChars = visibleChars;
             visibleChars = Math.min(currentPage.length(), visibleChars + charsPerFrame);
+            playChatSoundForReveal(currentPage, previousVisibleChars, visibleChars);
+            if (visibleChars >= currentPage.length()) {
+                chatSound.stop();
+            }
+        } else {
+            chatSound.stop();
         }
     }
 
@@ -57,6 +78,7 @@ public class DialogueBox {
         if (visibleChars < currentPage.length()) {
             // First press while text is typing: reveal all immediately.
             visibleChars = currentPage.length();
+            chatSound.stop();
             return;
         }
 
@@ -64,9 +86,21 @@ public class DialogueBox {
         if (pageIndex < pages.size() - 1) {
             pageIndex++;
             visibleChars = 0;
+            chatSoundCooldown = 0;
+            chatSound.stop();
         } else {
             active = false;
+            chatSound.stop();
         }
+    }
+
+    public void close() {
+        active = false;
+        chatSound.stop();
+        pages.clear();
+        pageIndex = 0;
+        visibleChars = 0;
+        chatSoundCooldown = 0;
     }
 
     public void draw(Graphics2D g2) {
@@ -128,6 +162,21 @@ public class DialogueBox {
         g2.setComposite(oldComposite);
         g2.setFont(oldFont);
         g2.setColor(oldColor);
+    }
+
+    private void playChatSoundForReveal(String page, int previousVisibleChars, int newVisibleChars) {
+        if (newVisibleChars <= previousVisibleChars || chatSoundCooldown > 0) {
+            return;
+        }
+
+        for (int i = previousVisibleChars; i < newVisibleChars; i++) {
+            char revealed = page.charAt(i);
+            if (!Character.isWhitespace(revealed)) {
+                chatSound.replay();
+                chatSoundCooldown = 2;
+                return;
+            }
+        }
     }
 
     private List<String> wrapText(String text, FontMetrics fm, int maxWidth) {

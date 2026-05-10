@@ -82,7 +82,7 @@ public class GamePanel extends JPanel implements Runnable{
     // ENTITY AND OBJECT
     public Player player = new Player(this,keyH, choice);
     public SuperObject obj[]= new SuperObject[120];
-    public Entity monster[] = new Entity[20];
+    public Entity monster[] = new Entity[40];
 
     // GAME STATE
     public  int gameState;
@@ -94,6 +94,10 @@ public class GamePanel extends JPanel implements Runnable{
     public final int introCutsceneState = 5;
     public final int characterSelectState = 6;
     public final int gameOverState = 7;
+    public final int endingState = 8;
+    public final int titleSettingsState = 9;
+    public final int titleLoadState = 10;
+    public final int titleSaveState = 11;
     private static final int TRANSITION_NONE = 0;
     private static final int TRANSITION_MAP = 1;
     private static final int TRANSITION_TITLE_START = 2;
@@ -102,7 +106,8 @@ public class GamePanel extends JPanel implements Runnable{
     private String currentMapPath = "/maps/stage01.txt";
     private String nextMapPath = null;
     private float fadeAlpha = 0f; // 0..1
-    private final float fadeSpeed = 0.3f;
+    private final float mapTransitionFadeSpeed = 0.06f;
+    private static final int MAP_TRANSITION_BLACK_HOLD_TICKS = 10;
     private final float titleStartFadeSpeed = 0.005f;
     private boolean fadeOutPhase = true;
     private int activeTransitionType = TRANSITION_NONE;
@@ -114,6 +119,7 @@ public class GamePanel extends JPanel implements Runnable{
     private final float phantomVoiceMinVolume = 0.10f;
     private final float phantomVoiceMaxVolume = 0.80f;
     private final float startingMasterVolume = 0.7f;
+    private final float dialogueMusicDuckMultiplier = 0.65f;
     private float masterVolume = startingMasterVolume;
     private final float volumeStep = 0.1f;
     private float cameraStageX;
@@ -123,7 +129,7 @@ public class GamePanel extends JPanel implements Runnable{
     private static final int CUTSCENE_NONE = 0;
     private static final int CUTSCENE_STAGE1_LIGHTS_TO_DOOR = 1;
     private static final int CUTSCENE_STAGE2_BOSS_INTRO = 2;
-    private static final int CUTSCENE_STAGE3_ESCAPE = 3;
+    private static final int CUTSCENE_STAGE3_ESCAPE = 4;
     private static final int CUTSCENE_PHASE_PAN_TO_TARGET = 0;
     private static final int CUTSCENE_PHASE_WAIT_FOR_DIALOGUE = 1;
     private static final int CUTSCENE_PHASE_RETURN_TO_PLAYER = 2;
@@ -135,6 +141,8 @@ public class GamePanel extends JPanel implements Runnable{
     private static final int CUTSCENE_STAGE3_PAN_TO_BOSS = 8;
     private static final int CUTSCENE_STAGE3_HOLD_ON_BOSS = 9;
     private static final int CUTSCENE_STAGE3_RETURN_AND_START_CHASE = 10;
+    private static final int CUTSCENE_STAGE3_SUMMON_ENEMIES = 11;
+    private static final int CUTSCENE_STAGE3_ELLIPSIS_DIALOGUE = 12;
     private static final int TITLE_START_BLACK_HOLD_TICKS = 30;
     private int activeCutscene = CUTSCENE_NONE;
     private int cutscenePhase = CUTSCENE_PHASE_PAN_TO_TARGET;
@@ -145,6 +153,11 @@ public class GamePanel extends JPanel implements Runnable{
     private boolean stage02BossIntroPlayed = false;
     private boolean stage02BossActivated = false;
     private int minionEffectTicks = 0;
+    private static final int PLAYER_DAMAGE_COOLDOWN_TICKS = 45;
+    private static final int STAGE3_PLAYER_DAMAGE_COOLDOWN_TICKS = 45;
+    private int playerDamageCooldownTicks = 0;
+    private boolean stage3HitFlickerSuppressed = false;
+    private static final int MAX_STAGE2_ACTIVE_MINIONS = 8;
     private final int[] candleSequence = {1, 2, 3, 4};
     private final java.util.List<Integer> litCandleOrder = new ArrayList<>();
     private boolean candlePuzzleSolved = false;
@@ -164,7 +177,34 @@ public class GamePanel extends JPanel implements Runnable{
     private Point stage3BossMarker;
     private int stage3MoveToClueTicks = 0;
     private boolean stage3BarrierBroken = false;
+    private int stage3SummonTick = 0;
+    private int stage3SummonIndex = 0;
+    private int stage3EllipsisHoldTicks = 0;
+    private final java.util.List<SpawnRequest> stage3PendingSpawns = new ArrayList<>();
     private static final int STAGE3_BOSS_PAN_HOLD_TICKS = 360;
+    private static final int STAGE3_SUMMON_INTERVAL_TICKS = 6;
+    private static final int STAGE3_SUMMON_FADE_TICKS = 18;
+    private static final int STAGE3_ELLIPSIS_HOLD_TICKS = 10;
+    private static final int STAGE3_MAX_E_PHANTOMS = 10;
+    private static final int ENDING_PHASE_BLACK_HOLD = 0;
+    private static final int ENDING_PHASE_PHANTOM_TEXT = 1;
+    private static final int ENDING_PHASE_WHITE_FADE = 2;
+    private static final int ENDING_PHASE_STATEMENT = 3;
+    private static final int ENDING_PHASE_FADE_TO_START = 4;
+    private static final int ENDING_BLACK_HOLD_TICKS = 60;
+    private static final int ENDING_PHANTOM_FADE_IN_TICKS = 90;
+    private static final int ENDING_PHANTOM_HOLD_TICKS = 60;
+    private static final int ENDING_PHANTOM_FADE_OUT_TICKS = 90;
+    // Black -> white transition duration (60 FPS). 3 seconds = 180 ticks.
+    private static final int ENDING_WHITE_FADE_TICKS = 180;
+    private static final int ENDING_STATEMENT_FADE_IN_TICKS = 45;
+    private static final int ENDING_STATEMENT_HOLD_TICKS = 180;
+    private static final int ENDING_STATEMENT_FADE_OUT_TICKS = 30;
+    private static final int ENDING_FADE_TO_START_TICKS = 90;
+    private static final int FIRST_ENEMY_HINT_DURATION_TICKS = 300;
+    private static final int GAME_OVER_OVERLAY_FADE_TICKS = 30;
+    private static final int GAME_OVER_TEXT_FADE_TICKS = 55;
+    private static final int GAME_OVER_BUTTON_FADE_TICKS = 80;
     private IntroCutscenePlayer introCutscenePlayer;
 
     /** Same order as the character selection UI: Lerler, Gasha, Nnyl, Gemal. */
@@ -173,6 +213,17 @@ public class GamePanel extends JPanel implements Runnable{
     int playerX = player.stageX;
     int playerY = player.stageY;
     int playerSpeed = 4;
+    private int endingPhase = ENDING_PHASE_BLACK_HOLD;
+    private int endingTick = 0;
+    private float endingWhiteAlpha = 0f;
+    private float endingPhantomTextAlpha = 0f;
+    private float endingStatementAlpha = 0f;
+    private boolean hotkeyGuideVisible = false;
+    private boolean firstEnemyHintPending = false;
+    private int firstEnemyHintTicksRemaining = 0;
+    private int gameOverSequenceTicks = 0;
+    private boolean stage3FlickerDisabled = false;
+    private int stage3EnemyUpdateFrameBucket = 0;
 
     public GamePanel (){
         this.setPreferredSize(new Dimension(screenWidth, screenHeight));
@@ -239,8 +290,8 @@ public class GamePanel extends JPanel implements Runnable{
         registerTileThought("/maps/stage01.txt", 3, 7,
                 "It's too dark to see properly.\n\nIf I can get the lights back on, maybe I can make sense of this place.");
 
-        registerTileThought("/maps/stage01.txt", 1, 2,
-                "There's a switch on the wall.\n\nIf I can get it working, I might finally see what's in this room.");
+        registerTileThought("/maps/stage01.txt", 1, 4,
+                "There's a switch on the wall right up ahead.\n\nI should check it out.");
 
         registerTileThought("/maps/stage01.txt", 7, 2, "stage01_7_2_or_7_4",
                 "An orange booklet...\n\nMaybe it explains what happened here.");
@@ -323,12 +374,20 @@ public class GamePanel extends JPanel implements Runnable{
         stage01DoorRevealPlayed = false;
         stage02BossIntroPlayed = false;
         stage02BossActivated = false;
+        monsterDimmingDialogueShown = false;
+        monsterDimmingDialoguePending = false;
+        firstEnemyHintPending = false;
+        firstEnemyHintTicksRemaining = 0;
         activeCutscene = CUTSCENE_NONE;
         stage3ChaseStarted = false;
         pendingReturnToTitleAfterDialogue = false;
         clearStage3CutsceneMarkers();
         stage3MoveToClueTicks = 0;
         stage3BarrierBroken = false;
+        resetEndingState();
+        resetGameOverSequence();
+        vignette.fullReset();
+        devSettings.reset();
         disposeIntroCutscenePlayer();
         resetCandlePuzzleState();
         player.hasKey = 0;
@@ -356,17 +415,252 @@ public class GamePanel extends JPanel implements Runnable{
         }
     }
 
+    public void saveGame(String saveFileName) {
+        // Ensure saves directory exists
+        java.io.File savesDir = new java.io.File("saves");
+        if (!savesDir.exists()) {
+            savesDir.mkdirs();
+        }
+
+        try (java.io.FileOutputStream fos = new java.io.FileOutputStream("saves/" + saveFileName + ".properties")) {
+            java.util.Properties props = new java.util.Properties();
+
+            // Player state
+            props.setProperty("player.life", String.valueOf(player.life));
+            props.setProperty("player.maxLife", String.valueOf(player.maxLife));
+            props.setProperty("player.stageX", String.valueOf(player.stageX));
+            props.setProperty("player.stageY", String.valueOf(player.stageY));
+            props.setProperty("player.hasKey", String.valueOf(player.hasKey));
+            props.setProperty("player.hasAxe", String.valueOf(player.hasAxe));
+            props.setProperty("player.hasReplacementSwitch", String.valueOf(player.hasReplacementSwitch));
+            props.setProperty("player.direction", player.direction);
+            props.setProperty("player.speed", String.valueOf(player.speed));
+
+            // Game state
+            props.setProperty("currentMapPath", currentMapPath);
+            props.setProperty("characterChoice", String.valueOf(choice));
+            props.setProperty("gameState", String.valueOf(gameState));
+
+            // Progress
+            props.setProperty("stage01DoorRevealPlayed", String.valueOf(stage01DoorRevealPlayed));
+            props.setProperty("stage02BossIntroPlayed", String.valueOf(stage02BossIntroPlayed));
+            props.setProperty("stage02BossActivated", String.valueOf(stage02BossActivated));
+            props.setProperty("monsterDimmingDialogueShown", String.valueOf(monsterDimmingDialogueShown));
+            props.setProperty("monsterDimmingDialoguePending", String.valueOf(monsterDimmingDialoguePending));
+            props.setProperty("stage3ChaseStarted", String.valueOf(stage3ChaseStarted));
+            props.setProperty("stage3BarrierBroken", String.valueOf(stage3BarrierBroken));
+            props.setProperty("firstEnemyHintPending", String.valueOf(firstEnemyHintPending));
+            props.setProperty("firstEnemyHintTicksRemaining", String.valueOf(firstEnemyHintTicksRemaining));
+
+            // Candle puzzle state
+            StringBuilder candleOrder = new StringBuilder();
+            for (int i : litCandleOrder) {
+                if (candleOrder.length() > 0) candleOrder.append(",");
+                candleOrder.append(i);
+            }
+            props.setProperty("litCandleOrder", candleOrder.toString());
+            props.setProperty("candlePuzzleSolved", String.valueOf(candlePuzzleSolved));
+
+            // Settings
+            props.setProperty("masterVolume", String.valueOf(masterVolume));
+            props.setProperty("developerMode", String.valueOf(devSettings.isTestMode()));
+
+            // Save timestamp
+            props.setProperty("saveTime", String.valueOf(System.currentTimeMillis()));
+
+            props.store(fos, "TekNoise Game Save");
+            System.out.println("Game saved to: " + saveFileName + ".properties");
+        } catch (Exception e) {
+            System.err.println("Failed to save game: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     public void loadGameFromCheckpoint() {
         try {
             Preferences prefs = Preferences.userNodeForPackage(GamePanel.class);
             String savedMap = prefs.get("checkpointMap", "/maps/stage01.txt");
             int savedChoice = prefs.getInt("characterChoice", 1);
-            
+
             prepareGameStart(savedChoice, savedMap);
             beginTitleStartTransition();
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    public void loadGame(String saveFileName) {
+        java.io.File saveFile = new java.io.File("saves/" + saveFileName + ".properties");
+        if (!saveFile.exists()) {
+            System.err.println("Save file does not exist: " + saveFileName + ".properties");
+            return;
+        }
+
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(saveFile)) {
+            java.util.Properties props = new java.util.Properties();
+            props.load(fis);
+
+            // Load all saved data first
+            int savedLife = Integer.parseInt(props.getProperty("player.life", "6"));
+            int savedMaxLife = Integer.parseInt(props.getProperty("player.maxLife", "6"));
+            int savedStageX = Integer.parseInt(props.getProperty("player.stageX", "100"));
+            int savedStageY = Integer.parseInt(props.getProperty("player.stageY", "100"));
+            int savedHasKey = Integer.parseInt(props.getProperty("player.hasKey", "0"));
+            boolean savedHasAxe = Boolean.parseBoolean(props.getProperty("player.hasAxe", "false"));
+            boolean savedHasReplacementSwitch = Boolean.parseBoolean(props.getProperty("player.hasReplacementSwitch", "false"));
+            String savedDirection = props.getProperty("player.direction", "down");
+            float savedSpeed = Float.parseFloat(props.getProperty("player.speed", "2.5f"));
+
+            String savedMapPath = props.getProperty("currentMapPath", "/maps/stage01.txt");
+            int savedChoice = Integer.parseInt(props.getProperty("characterChoice", "1"));
+            int savedGameState = Integer.parseInt(props.getProperty("gameState", String.valueOf(titleState)));
+
+            boolean savedStage01DoorRevealPlayed = Boolean.parseBoolean(props.getProperty("stage01DoorRevealPlayed", "false"));
+            boolean savedStage02BossIntroPlayed = Boolean.parseBoolean(props.getProperty("stage02BossIntroPlayed", "false"));
+            boolean savedStage02BossActivated = Boolean.parseBoolean(props.getProperty("stage02BossActivated", "false"));
+            boolean savedMonsterDimmingDialogueShown = Boolean.parseBoolean(props.getProperty("monsterDimmingDialogueShown", "false"));
+            boolean savedMonsterDimmingDialoguePending = Boolean.parseBoolean(props.getProperty("monsterDimmingDialoguePending", "false"));
+            boolean savedStage3ChaseStarted = Boolean.parseBoolean(props.getProperty("stage3ChaseStarted", "false"));
+            boolean savedStage3BarrierBroken = Boolean.parseBoolean(props.getProperty("stage3BarrierBroken", "false"));
+            boolean savedFirstEnemyHintPending = Boolean.parseBoolean(props.getProperty("firstEnemyHintPending", "false"));
+            int savedFirstEnemyHintTicksRemaining = Integer.parseInt(props.getProperty("firstEnemyHintTicksRemaining", "0"));
+
+            String candleOrderStr = props.getProperty("litCandleOrder", "");
+            java.util.List<Integer> savedLitCandleOrder = new java.util.ArrayList<>();
+            if (!candleOrderStr.isEmpty()) {
+                String[] parts = candleOrderStr.split(",");
+                for (String part : parts) {
+                    savedLitCandleOrder.add(Integer.parseInt(part.trim()));
+                }
+            }
+            boolean savedCandlePuzzleSolved = Boolean.parseBoolean(props.getProperty("candlePuzzleSolved", "false"));
+
+            float savedMasterVolume = Float.parseFloat(props.getProperty("masterVolume", "0.7"));
+            boolean savedDeveloperMode = Boolean.parseBoolean(props.getProperty("developerMode", "true"));
+
+            // Initialize game with saved map WITHOUT resetting state
+            choice = savedChoice;
+            player = new Player(this, keyH, choice);
+            player.setWalkingVolume(savedMasterVolume);
+            keyH.interactPressed = false;
+            keyH.sprintPressed = false;
+
+            currentMapPath = savedMapPath;
+            nextMapPath = null;
+            fadeAlpha = 0f;
+            fadeOutPhase = true;
+            activeTransitionType = TRANSITION_NONE;
+            showTitleDuringTransition = false;
+            transitionHoldTicks = 0;
+            disposeIntroCutscenePlayer();
+
+            // Load map and set up world
+            tileM.loadMap(currentMapPath);
+            currentMapConfig = tileM.getCurrentMapConfig();
+            updateWorldDimensions();
+
+            // Apply saved player state BEFORE setting spawn
+            player.life = Math.max(0, Math.min(savedMaxLife, savedLife));
+            player.maxLife = savedMaxLife;
+            player.stageX = savedStageX;
+            player.stageY = savedStageY;
+            player.hasKey = savedHasKey;
+            player.hasAxe = savedHasAxe;
+            player.hasReplacementSwitch = savedHasReplacementSwitch;
+            player.direction = savedDirection;
+            player.speed = savedSpeed;
+
+            // Set up objects and monsters for the loaded map
+            assetSetter.setObject(currentMapPath);
+            assetSetter.setMonster(currentMapPath);
+
+            // Apply saved game state (NOT resetting to defaults)
+            resetStageThoughtState();
+            stage01DoorRevealPlayed = savedStage01DoorRevealPlayed;
+            stage02BossIntroPlayed = savedStage02BossIntroPlayed;
+            stage02BossActivated = savedStage02BossActivated;
+            monsterDimmingDialogueShown = savedMonsterDimmingDialogueShown;
+            monsterDimmingDialoguePending = savedMonsterDimmingDialoguePending;
+            stage3ChaseStarted = savedStage3ChaseStarted;
+            stage3BarrierBroken = savedStage3BarrierBroken;
+            firstEnemyHintPending = savedFirstEnemyHintPending;
+            firstEnemyHintTicksRemaining = savedFirstEnemyHintTicksRemaining;
+            activeCutscene = CUTSCENE_NONE;
+            pendingReturnToTitleAfterDialogue = false;
+            clearStage3CutsceneMarkers();
+            stage3MoveToClueTicks = 0;
+            resetEndingState();
+            resetGameOverSequence();
+            vignette.fullReset();
+            resetCandlePuzzleState();
+
+            // Apply saved candle state
+            litCandleOrder.clear();
+            litCandleOrder.addAll(savedLitCandleOrder);
+            candlePuzzleSolved = savedCandlePuzzleSolved;
+
+            // Apply saved settings
+            masterVolume = savedMasterVolume;
+            devSettings.setTestMode(savedDeveloperMode);
+            applyMusicVolume();
+
+            // Set up audio and camera
+            phantomVoice.setFile(6);
+            phantomVoiceVolume = 0f;
+            applyPhantomVoiceVolume();
+            snapCameraToPlayer();
+
+            // Start game directly without title transition
+            gameState = savedGameState == titleState ? playState : savedGameState;
+            playMusic(1);
+
+            System.out.println("Game loaded from: " + saveFileName + ".properties");
+        } catch (Exception e) {
+            System.err.println("Failed to load game: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public java.util.List<String> getAvailableSaveFiles() {
+        java.util.List<String> saveFiles = new java.util.ArrayList<>();
+        java.io.File savesDir = new java.io.File("saves");
+        if (savesDir.exists() && savesDir.isDirectory()) {
+            java.io.File[] files = savesDir.listFiles((dir, name) -> name.endsWith(".properties"));
+            if (files != null) {
+                for (java.io.File file : files) {
+                    String name = file.getName();
+                    saveFiles.add(name.substring(0, name.lastIndexOf(".properties")));
+                }
+            }
+        }
+        return saveFiles;
+    }
+
+    public java.util.Map<String, String> getSaveFileInfo(String saveFileName) {
+        java.util.Map<String, String> info = new java.util.HashMap<>();
+        java.io.File saveFile = new java.io.File("saves/" + saveFileName + ".properties");
+        
+        // Check if file exists before trying to read it
+        if (!saveFile.exists()) {
+            return info; // Return empty map for non-existent files
+        }
+        
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(saveFile)) {
+            java.util.Properties props = new java.util.Properties();
+            props.load(fis);
+
+            String mapPath = props.getProperty("currentMapPath", "Unknown");
+            String characterChoice = props.getProperty("characterChoice", "1");
+            String saveTime = props.getProperty("saveTime", "0");
+
+            info.put("map", mapPath);
+            info.put("character", characterChoice);
+            info.put("time", saveTime);
+        } catch (Exception e) {
+            // Silently handle exceptions - return empty map
+            System.err.println("Error reading save file " + saveFileName + ": " + e.getMessage());
+        }
+        return info;
     }
 
     public void startGameThread(){
@@ -426,12 +720,20 @@ public class GamePanel extends JPanel implements Runnable{
         stage01DoorRevealPlayed = false;
         stage02BossIntroPlayed = false;
         stage02BossActivated = false;
+        monsterDimmingDialogueShown = false;
+        monsterDimmingDialoguePending = false;
+        firstEnemyHintPending = false;
+        firstEnemyHintTicksRemaining = 0;
         activeCutscene = CUTSCENE_NONE;
         stage3ChaseStarted = false;
         pendingReturnToTitleAfterDialogue = false;
         clearStage3CutsceneMarkers();
         stage3MoveToClueTicks = 0;
         stage3BarrierBroken = false;
+        resetEndingState();
+        resetGameOverSequence();
+        vignette.fullReset();
+        devSettings.reset();
         resetCandlePuzzleState();
 
         tileM.loadMap(currentMapPath);
@@ -487,6 +789,7 @@ public class GamePanel extends JPanel implements Runnable{
             interactCooldown--;
         }
         if(gameState == playState) {
+            updateStageSpecificVisualModes();
             devSettings.applyContinuousEffects();
             updateTemporaryEffects();
             player.update();
@@ -496,11 +799,18 @@ public class GamePanel extends JPanel implements Runnable{
             if (!ui.isDialogueActive()) {
                 for(int i = 0; i < monster.length; i++) {
                     if(monster[i] != null) {
-                        monster[i].update();
+                        if (shouldRunMonsterLogicThisFrame(i)) {
+                            monster[i].update();
+                        } else {
+                            monster[i].updateAnimationOnly();
+                        }
                         if (monster[i] != null && monster[i].removeFromWorld) {
                             monster[i] = null;
                         }
                     }
+                }
+                if (stage3ChaseStarted) {
+                    stage3EnemyUpdateFrameBucket = (stage3EnemyUpdateFrameBucket + 1) & 1;
                 }
 
                 stageTicks++;
@@ -513,6 +823,7 @@ public class GamePanel extends JPanel implements Runnable{
             //nothing
         }
         if (gameState == cutsceneState) {
+            updateStageSpecificVisualModes();
             updateTemporaryEffects();
             updateCutscene();
             vignette.update();
@@ -524,14 +835,28 @@ public class GamePanel extends JPanel implements Runnable{
             updateTransition();
         }
         if (gameState == gameOverState) {
-            // Wait for input to restart or go back to menu, handled via UI.update() and MouseHandler
+            updateGameOverSequence();
+        }
+        if (gameState == endingState) {
+            updateEndingSequence();
         }
         ui.update();
+        applyMusicVolume();
+        if (gameState == playState && monsterDimmingDialoguePending && !ui.isDialogueActive()) {
+            showMonsterDimmingDialogue();
+        }
+        if (gameState == playState && firstEnemyHintPending && !ui.isDialogueActive()) {
+            firstEnemyHintPending = false;
+            firstEnemyHintTicksRemaining = FIRST_ENEMY_HINT_DURATION_TICKS;
+        }
+        if (gameState == playState && !ui.isDialogueActive() && firstEnemyHintTicksRemaining > 0) {
+            firstEnemyHintTicksRemaining--;
+        }
         if (gameState == cutsceneState && ui.isDialogueActive() && keyH.interactPressed) {
             ui.advanceDialogue();
             keyH.interactPressed = false;
         }
-        if (gameState != playState && gameState != cutsceneState && gameState != introCutsceneState && gameState != gameOverState) {
+        if (gameState != playState && gameState != cutsceneState && gameState != introCutsceneState && gameState != gameOverState && gameState != endingState) {
             if (pendingReturnToTitleAfterDialogue && !ui.isDialogueActive()) {
                 pendingReturnToTitleAfterDialogue = false;
                 currentMapPath = "/maps/stage01.txt";
@@ -541,20 +866,21 @@ public class GamePanel extends JPanel implements Runnable{
                 setupGame();
             }
         }
-        if (gameState != playState && gameState != cutsceneState && gameState != gameOverState) {
+        if (gameState != playState && gameState != cutsceneState && gameState != gameOverState && gameState != endingState) {
             checkEnemyProximityDimming();
             vignette.update();
         }
     }
 
     private void updateIntroCutscene() {
-        if (introCutscenePlayer == null) {
+        IntroCutscenePlayer player = introCutscenePlayer;
+        if (player == null) {
             finishIntroCutscene();
             return;
         }
 
-        introCutscenePlayer.update();
-        if (introCutscenePlayer.isFinished()) {
+        player.update();
+        if (player.isFinished()) {
             finishIntroCutscene();
         }
     }
@@ -693,11 +1019,15 @@ public class GamePanel extends JPanel implements Runnable{
             if (nearestDistance <= flickerDistance) {
                 enemyFlickerLevel = 1f - (float) Math.min(1.0, nearestDistance / flickerDistance);
             }
+
+            if ("/maps/stage01.txt".equals(currentMapPath) && !monsterDimmingDialogueShown) {
+                monsterDimmingDialoguePending = true;
+            }
         }
 
         vignette.setEnemyProximityLevel(enemyProximityLevel);
         vignette.setEnemyFlickerLevel(enemyFlickerLevel);
-        
+
         // Removed dynamic phantom voice update which was dynamically dimming (muting) the background music 
         // when being near an enemy / damaged.
     }
@@ -736,8 +1066,11 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     private void applyMusicVolume() {
-        // Disabled dynamic ducking to ensure music does not lower when getting damaged
-        music.setVolume(masterVolume);
+        float targetVolume = masterVolume;
+        if (ui != null && ui.isDialogueActive()) {
+            targetVolume *= dialogueMusicDuckMultiplier;
+        }
+        music.setVolume(targetVolume);
     }
 
     private void showMonsterDimmingDialogue() {
@@ -746,6 +1079,7 @@ public class GamePanel extends JPanel implements Runnable{
                 + "Stay alert when this happens.");
         monsterDimmingDialogueShown = true;
         monsterDimmingDialoguePending = false;
+        firstEnemyHintPending = true;
     }
 
     private void updateTransition() {
@@ -776,9 +1110,14 @@ public class GamePanel extends JPanel implements Runnable{
         }
 
         if (fadeOutPhase) {
-            fadeAlpha += fadeSpeed;
+            fadeAlpha += mapTransitionFadeSpeed;
             if (fadeAlpha >= 1f) {
                 fadeAlpha = 1f;
+                if (transitionHoldTicks < MAP_TRANSITION_BLACK_HOLD_TICKS) {
+                    transitionHoldTicks++;
+                    return;
+                }
+                transitionHoldTicks = 0;
 
                 // Swap map at full black
                 currentMapPath = nextMapPath;
@@ -802,13 +1141,23 @@ public class GamePanel extends JPanel implements Runnable{
                 player.hasKey = 0; // keys are per-stage
                 player.hasReplacementSwitch = false; // repair parts are per-stage
                 resetCandlePuzzleState();
+                if (nextMapPath.equals(currentMapPath) && "/maps/stage01.txt".equals(currentMapPath)) {
+                    vignette.fullReset();
+                } else {
+                    vignette.reset();
+                }
                 stage02BossIntroPlayed = false;
                 stage02BossActivated = false;
+                monsterDimmingDialogueShown = false;
+                monsterDimmingDialoguePending = false;
+                firstEnemyHintPending = false;
+                firstEnemyHintTicksRemaining = 0;
                 stage3ChaseStarted = false;
                 pendingReturnToTitleAfterDialogue = false;
                 clearStage3CutsceneMarkers();
                 stage3MoveToClueTicks = 0;
                 stage3BarrierBroken = false;
+                resetGameOverSequence();
                 assetSetter.setObject(currentMapPath);
                 assetSetter.setMonster(currentMapPath);
                 
@@ -818,7 +1167,7 @@ public class GamePanel extends JPanel implements Runnable{
                 fadeOutPhase = false;
             }
         } else {
-            fadeAlpha -= fadeSpeed;
+            fadeAlpha -= mapTransitionFadeSpeed;
             if (fadeAlpha <= 0f) {
                 fadeAlpha = 0f;
                 nextMapPath = null;
@@ -876,11 +1225,12 @@ public class GamePanel extends JPanel implements Runnable{
         activeTransitionType = TRANSITION_MAP;
         showTitleDuringTransition = false;
         transitionHoldTicks = 0;
+        vignette.reset();
         gameState = transitionState;
     }
 
     public void loadStageForTesting(String mapPath) {
-        if (!DevSettings.TEST_MODE) {
+        if (!devSettings.isTestMode()) {
             return;
         }
 
@@ -899,15 +1249,22 @@ public class GamePanel extends JPanel implements Runnable{
         updateWorldDimensions();
 
         resetStageThoughtState();
+        vignette.fullReset();
         resetCandlePuzzleState();
         stage02BossIntroPlayed = false;
         stage02BossActivated = false;
+        monsterDimmingDialogueShown = false;
+        monsterDimmingDialoguePending = false;
+        firstEnemyHintPending = false;
+        firstEnemyHintTicksRemaining = 0;
         activeCutscene = CUTSCENE_NONE;
         stage3ChaseStarted = false;
         pendingReturnToTitleAfterDialogue = false;
         clearStage3CutsceneMarkers();
         stage3MoveToClueTicks = 0;
         stage3BarrierBroken = false;
+        resetEndingState();
+        resetGameOverSequence();
 
         int currentLife = player.life;
         boolean hadAxe = player.hasAxe;
@@ -972,6 +1329,13 @@ public class GamePanel extends JPanel implements Runnable{
         }
 
         return false;
+    }
+    
+    public int getMapTileNumAt(int col, int row) {
+        if (col < 0 || row < 0 || col >= maxStageCol || row >= maxStageRow) {
+            return -1;
+        }
+        return tileM.mapTileNum[col][row];
     }
 
     public void startStage1DoorRevealCutscene() {
@@ -1072,8 +1436,13 @@ public class GamePanel extends JPanel implements Runnable{
 
     public void spawnStage2Minions(int sourceX, int sourceY, int count) {
         for (int spawned = 0; spawned < count; spawned++) {
+            if (countActiveStage2Minions() >= MAX_STAGE2_ACTIVE_MINIONS) {
+                System.out.println("[SPAWN FAIL] Minion cap reached: " + countActiveStage2Minions() + "/" + MAX_STAGE2_ACTIVE_MINIONS);
+                return;
+            }
             int slot = findFreeMonsterSlot();
             if (slot == -1) {
+                System.out.println("[SPAWN FAIL] No free monster slots! Array full at " + spawned + "/" + count);
                 return;
             }
 
@@ -1081,7 +1450,18 @@ public class GamePanel extends JPanel implements Runnable{
             minion.stageX = sourceX + ((spawned % 3) - 1) * tileSize;
             minion.stageY = sourceY + ((spawned / 3) + 1) * tileSize;
             monster[slot] = minion;
+            System.out.println("[SPAWN OK] Minion " + spawned + " spawned at slot " + slot);
         }
+    }
+
+    private int countActiveStage2Minions() {
+        int active = 0;
+        for (Entity entity : monster) {
+            if (entity instanceof MON_MinionWitherSlime) {
+                active++;
+            }
+        }
+        return active;
     }
 
     private int findFreeMonsterSlot() {
@@ -1094,13 +1474,49 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void applyStage2MinionHitEffect() {
+        if (!consumePlayerDamageWindow()) {
+            return;
+        }
+        player.onDamageImpact();
         minionEffectTicks = 180;
         player.setControlsInvertedTicks(180);
         vignette.setEnemyProximityLevel(1f);
         vignette.setEnemyFlickerLevel(1f);
     }
 
+    public boolean consumePlayerDamageWindow() {
+        if (playerDamageCooldownTicks > 0) {
+            return false;
+        }
+        if ("/maps/stage03.txt".equals(currentMapPath)) {
+            playerDamageCooldownTicks = STAGE3_PLAYER_DAMAGE_COOLDOWN_TICKS;
+        } else {
+            playerDamageCooldownTicks = PLAYER_DAMAGE_COOLDOWN_TICKS;
+        }
+        return true;
+    }
+
+    public boolean isPlayerInDamageCooldownWindow() {
+        return playerDamageCooldownTicks > 0;
+    }
+
     private void updateTemporaryEffects() {
+        if (playerDamageCooldownTicks > 0) {
+            playerDamageCooldownTicks--;
+        }
+        if ("/maps/stage03.txt".equals(currentMapPath)) {
+            if (playerDamageCooldownTicks > 0 && !stage3HitFlickerSuppressed) {
+                vignette.setFlicker(false);
+                vignette.setEnemyFlickerLevel(0f);
+                stage3HitFlickerSuppressed = true;
+            } else if (playerDamageCooldownTicks <= 0 && stage3HitFlickerSuppressed) {
+                vignette.setFlicker(true);
+                stage3HitFlickerSuppressed = false;
+            }
+        } else if (stage3HitFlickerSuppressed) {
+            vignette.setFlicker(true);
+            stage3HitFlickerSuppressed = false;
+        }
         if (minionEffectTicks > 0) {
             minionEffectTicks--;
         }
@@ -1154,7 +1570,9 @@ public class GamePanel extends JPanel implements Runnable{
             if ("/maps/stage03.txt".equals(currentMapPath)) {
                 startStage3EscapeCutscene();
             } else {
-                ui.showMessage("The candles burn steadily.\n\nSomething clicked in the distance.");
+                ui.showMessage("Jhon Pork Tocino: Great job! The light is back.\n\n"
+                        + "Jerky Jake looks much stronger now.\n\n"
+                        + "Come talk to us, we have something for you.");
             }
         } else {
             turnOffAllCandles();
@@ -1230,9 +1648,186 @@ public class GamePanel extends JPanel implements Runnable{
         }
 
         stopMusic();
-        ui.showMessage("You make it through the door.\n\nThe hallway beyond is quiet.\n\nFor now.");
-        pendingReturnToTitleAfterDialogue = true;
-        gameState = playState;
+        resetEndingState();
+        gameState = endingState;
+    }
+
+    public void removeHauntingEnergyHints() {
+        for (int i = 0; i < obj.length; i++) {
+            if (obj[i] instanceof objects.OBJ_HauntingEnergyHint) {
+                obj[i] = null;
+            }
+        }
+    }
+
+    private void updateEndingSequence() {
+        endingTick++;
+
+        if (endingPhase == ENDING_PHASE_BLACK_HOLD) {
+            endingWhiteAlpha = 0f;
+            endingPhantomTextAlpha = 0f;
+            endingStatementAlpha = 0f;
+            if (endingTick >= ENDING_BLACK_HOLD_TICKS) {
+                endingPhase = ENDING_PHASE_PHANTOM_TEXT;
+                endingTick = 0;
+            }
+            return;
+        }
+
+        if (endingPhase == ENDING_PHASE_PHANTOM_TEXT) {
+            int totalTicks = ENDING_PHANTOM_FADE_IN_TICKS + ENDING_PHANTOM_HOLD_TICKS + ENDING_PHANTOM_FADE_OUT_TICKS;
+            if (endingTick <= ENDING_PHANTOM_FADE_IN_TICKS) {
+                endingPhantomTextAlpha = (float) endingTick / ENDING_PHANTOM_FADE_IN_TICKS;
+            } else if (endingTick <= ENDING_PHANTOM_FADE_IN_TICKS + ENDING_PHANTOM_HOLD_TICKS) {
+                endingPhantomTextAlpha = 1f;
+            } else {
+                int fadeOutTick = endingTick - ENDING_PHANTOM_FADE_IN_TICKS - ENDING_PHANTOM_HOLD_TICKS;
+                endingPhantomTextAlpha = 1f - ((float) fadeOutTick / ENDING_PHANTOM_FADE_OUT_TICKS);
+            }
+            endingPhantomTextAlpha = Math.max(0f, Math.min(1f, endingPhantomTextAlpha));
+            if (endingTick >= totalTicks) {
+                endingPhase = ENDING_PHASE_WHITE_FADE;
+                endingTick = 0;
+                endingPhantomTextAlpha = 0f;
+            }
+            return;
+        }
+
+        if (endingPhase == ENDING_PHASE_WHITE_FADE) {
+            endingWhiteAlpha = Math.min(1f, (float) endingTick / ENDING_WHITE_FADE_TICKS);
+            // Once white starts showing up, make sure the previous phantom text is fully gone.
+            endingPhantomTextAlpha = 0f;
+            if (endingTick >= ENDING_WHITE_FADE_TICKS) {
+                endingPhase = ENDING_PHASE_STATEMENT;
+                endingTick = 0;
+                endingWhiteAlpha = 1f;
+            }
+            return;
+        }
+
+        if (endingPhase == ENDING_PHASE_STATEMENT) {
+            int totalStatementLines = ui.getEndingStatementLineCount();
+            int ticksPerLine = ENDING_STATEMENT_FADE_IN_TICKS + ENDING_STATEMENT_HOLD_TICKS + ENDING_STATEMENT_FADE_OUT_TICKS;
+            int lineTick = ticksPerLine <= 0 ? 0 : endingTick % ticksPerLine;
+
+            if (lineTick <= ENDING_STATEMENT_FADE_IN_TICKS) {
+                endingStatementAlpha = (float) lineTick / ENDING_STATEMENT_FADE_IN_TICKS;
+            } else if (lineTick <= ENDING_STATEMENT_FADE_IN_TICKS + ENDING_STATEMENT_HOLD_TICKS) {
+                endingStatementAlpha = 1f;
+            } else {
+                int fadeOutTick = lineTick - ENDING_STATEMENT_FADE_IN_TICKS - ENDING_STATEMENT_HOLD_TICKS;
+                endingStatementAlpha = 1f - ((float) fadeOutTick / ENDING_STATEMENT_FADE_OUT_TICKS);
+            }
+            endingStatementAlpha = Math.max(0f, Math.min(1f, endingStatementAlpha));
+            if (endingTick >= ticksPerLine * totalStatementLines) {
+                endingPhase = ENDING_PHASE_FADE_TO_START;
+                endingTick = 0;
+            }
+            return;
+        }
+
+        if (endingPhase == ENDING_PHASE_FADE_TO_START) {
+            float fadeOutProgress = 1f - Math.min(1f, (float) endingTick / ENDING_FADE_TO_START_TICKS);
+            endingWhiteAlpha = fadeOutProgress;
+            endingStatementAlpha = 0f;
+            if (endingTick >= ENDING_FADE_TO_START_TICKS) {
+                endingPhase = ENDING_PHASE_BLACK_HOLD;
+                endingTick = 0;
+                endingWhiteAlpha = 0f;
+                endingPhantomTextAlpha = 0f;
+                endingStatementAlpha = 0f;
+                currentMapPath = "/maps/stage01.txt";
+                tileM.loadMap(currentMapPath);
+                currentMapConfig = tileM.getCurrentMapConfig();
+                updateWorldDimensions();
+                setupGame();
+            }
+        }
+    }
+
+    private void resetEndingState() {
+        endingPhase = ENDING_PHASE_BLACK_HOLD;
+        endingTick = 0;
+        endingWhiteAlpha = 0f;
+        endingPhantomTextAlpha = 0f;
+        endingStatementAlpha = 0f;
+    }
+
+    private void resetGameOverSequence() {
+        gameOverSequenceTicks = 0;
+    }
+
+    public float getEndingWhiteAlpha() {
+        return endingWhiteAlpha;
+    }
+
+    public float getEndingPhantomTextAlpha() {
+        return endingPhantomTextAlpha;
+    }
+
+    public float getEndingStatementAlpha() {
+        return endingStatementAlpha;
+    }
+
+    public int getEndingStatementLineIndex() {
+        int ticksPerLine = ENDING_STATEMENT_FADE_IN_TICKS + ENDING_STATEMENT_HOLD_TICKS + ENDING_STATEMENT_FADE_OUT_TICKS;
+        if (ticksPerLine <= 0 || endingPhase != ENDING_PHASE_STATEMENT) {
+            return 0;
+        }
+        return Math.max(0, endingTick / ticksPerLine);
+    }
+
+    public boolean shouldShowFirstEnemyHint() {
+        return firstEnemyHintTicksRemaining > 0 && gameState == playState && !ui.isDialogueActive();
+    }
+
+    public float getFirstEnemyHintAlpha() {
+        if (FIRST_ENEMY_HINT_DURATION_TICKS <= 0 || firstEnemyHintTicksRemaining <= 0) {
+            return 0f;
+        }
+        return Math.max(0f, Math.min(1f, (float) firstEnemyHintTicksRemaining / FIRST_ENEMY_HINT_DURATION_TICKS));
+    }
+
+    public void startGameOverSequence() {
+        if (gameState == gameOverState) {
+            return;
+        }
+        stopMusic();
+        resetGameOverSequence();
+        ui.commandNum = 0;
+        gameState = gameOverState;
+    }
+
+    private void updateGameOverSequence() {
+        gameOverSequenceTicks++;
+    }
+
+    public float getGameOverOverlayAlpha() {
+        return Math.max(0f, Math.min(1f, (float) gameOverSequenceTicks / GAME_OVER_OVERLAY_FADE_TICKS));
+    }
+
+    public float getGameOverTextAlpha() {
+        return Math.max(0f, Math.min(1f, (float) gameOverSequenceTicks / GAME_OVER_TEXT_FADE_TICKS));
+    }
+
+    public float getGameOverButtonAlpha() {
+        return Math.max(0f, Math.min(1f, (float) gameOverSequenceTicks / GAME_OVER_BUTTON_FADE_TICKS));
+    }
+
+    public boolean isGameOverInputReady() {
+        return gameOverSequenceTicks >= GAME_OVER_BUTTON_FADE_TICKS;
+    }
+
+    public void toggleHotkeyGuide() {
+        hotkeyGuideVisible = !hotkeyGuideVisible;
+    }
+
+    public boolean isHotkeyGuideVisible() {
+        return hotkeyGuideVisible;
+    }
+
+    public void closeHotkeyGuide() {
+        hotkeyGuideVisible = false;
     }
 
     private void startStage3EscapeCutscene() {
@@ -1332,14 +1927,54 @@ public class GamePanel extends JPanel implements Runnable{
 
         if (cutscenePhase == CUTSCENE_STAGE3_PAN_TO_BOSS) {
             if (moveCameraToward(cutsceneTargetStageX, cutsceneTargetStageY, CAMERA_PAN_SPEED * 1.4f)) {
-                summonStage3ChaseEnemies();
-                cutsceneHoldTicks = STAGE3_BOSS_PAN_HOLD_TICKS;
-                cutscenePhase = CUTSCENE_STAGE3_HOLD_ON_BOSS;
+                prepareStage3ChaseSummons();
+                stage3SummonTick = 0;
+                stage3SummonIndex = 0;
+                cutscenePhase = CUTSCENE_STAGE3_SUMMON_ENEMIES;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_SUMMON_ENEMIES) {
+            stage3SummonTick++;
+            if (stage3SummonIndex < stage3PendingSpawns.size()
+                    && (stage3SummonTick % STAGE3_SUMMON_INTERVAL_TICKS) == 0) {
+                SpawnRequest req = stage3PendingSpawns.get(stage3SummonIndex);
+                if (req != null && req.entity != null) {
+                    req.entity.startFadeIn(STAGE3_SUMMON_FADE_TICKS);
+                    assetSetter.spawnMonster(req.entity, req.col, req.row);
+                }
+                stage3SummonIndex++;
+            }
+            if (stage3SummonIndex >= stage3PendingSpawns.size()) {
+                stage3EllipsisHoldTicks = STAGE3_ELLIPSIS_HOLD_TICKS;
+                cutscenePhase = CUTSCENE_STAGE3_ELLIPSIS_DIALOGUE;
+            }
+            return;
+        }
+
+        if (cutscenePhase == CUTSCENE_STAGE3_ELLIPSIS_DIALOGUE) {
+            if (stage3EllipsisHoldTicks > 0) {
+                stage3EllipsisHoldTicks--;
+                return;
+            }
+            if (cutsceneHoldTicks == 0 && !ui.isDialogueActive()) {
+                ui.showMessage(".....\n\n.....\n\n.....");
+                cutsceneHoldTicks = 1; // mark dialogue as already shown once
+            }
+
+            boolean cameraReturned = moveCameraToward(player.stageX, player.stageY, CAMERA_PAN_SPEED * 1.4f);
+            if (cameraReturned && !ui.isDialogueActive()) {
+                activeCutscene = CUTSCENE_NONE;
+                gameState = playState;
             }
             return;
         }
 
         if (cutscenePhase == CUTSCENE_STAGE3_HOLD_ON_BOSS) {
+            if (ui.isDialogueActive()) {
+                return;
+            }
             if (cutsceneHoldTicks > 0) {
                 cutsceneHoldTicks--;
             } else {
@@ -1427,6 +2062,17 @@ public class GamePanel extends JPanel implements Runnable{
     private void breakStage3CutsceneBarrier() {
         if (stage3BreakMarkers == null || stage3BreakMarkers.isEmpty()) {
             return;
+        }
+        
+        // Break the barrier tiles (XX markers) so they disappear and become walkable.
+        for (Point breakMarker : stage3BreakMarkers) {
+            if (breakMarker == null) continue;
+            int col = breakMarker.x;
+            int row = breakMarker.y;
+            if (col < 0 || row < 0 || col >= maxStageCol || row >= maxStageRow) continue;
+            if (tileM != null && tileM.mapTileNum != null) {
+                tileM.mapTileNum[col][row] = 0;
+            }
         }
 
         for (int i = 0; i < obj.length; i++) {
@@ -1559,6 +2205,47 @@ public class GamePanel extends JPanel implements Runnable{
             MON_Stage2WitherBoss boss = new MON_Stage2WitherBoss(this);
             boss.activateForStage3Chase();
             assetSetter.spawnMonster(boss, marker.x, marker.y);
+        }
+    }
+
+    private static class SpawnRequest {
+        final Entity entity;
+        final int col;
+        final int row;
+
+        private SpawnRequest(Entity entity, int col, int row) {
+            this.entity = entity;
+            this.col = col;
+            this.row = row;
+        }
+    }
+
+    private void prepareStage3ChaseSummons() {
+        stage3PendingSpawns.clear();
+
+        MON_Stage3BossMomo stage3Boss = new MON_Stage3BossMomo(this);
+        stage3Boss.activateForStage3Chase();
+        stage3PendingSpawns.add(new SpawnRequest(stage3Boss, stage3BossMarker.x, stage3BossMarker.y));
+
+        java.util.List<Point> phantomMarkers = assetSetter.findMapMarkers(currentMapPath, "E");
+        int variant = 1;
+        int spawnedPhantoms = 0;
+        for (Point marker : phantomMarkers) {
+            if (spawnedPhantoms >= STAGE3_MAX_E_PHANTOMS) {
+                break;
+            }
+            MON_Dementor phantom = new MON_Dementor(this, variant);
+            phantom.activateForStage3Chase();
+            stage3PendingSpawns.add(new SpawnRequest(phantom, marker.x, marker.y));
+            variant = variant == 4 ? 1 : variant + 1;
+            spawnedPhantoms++;
+        }
+
+        java.util.List<Point> stage2BossMarkers = assetSetter.findMapMarkers(currentMapPath, "S2");
+        for (Point marker : stage2BossMarkers) {
+            MON_Stage2WitherBoss boss = new MON_Stage2WitherBoss(this);
+            boss.activateForStage3Chase();
+            stage3PendingSpawns.add(new SpawnRequest(boss, marker.x, marker.y));
         }
     }
 
@@ -1755,9 +2442,37 @@ public class GamePanel extends JPanel implements Runnable{
     }
 
     public void playSE(int i) {
-        se.setFile(i);
         se.setVolume(masterVolume);
+        if (se.getCurrentFileIndex() == i && se.clip != null && se.clip.isOpen()) {
+            se.replay();
+            return;
+        }
+        se.setFile(i);
         se.play();
+    }
+
+    private void updateStageSpecificVisualModes() {
+        boolean isStage3 = "/maps/stage03.txt".equals(currentMapPath);
+        if (isStage3 && !stage3FlickerDisabled) {
+            vignette.setFlicker(false);
+            vignette.setEnemyFlickerLevel(0f);
+            stage3FlickerDisabled = true;
+        } else if (!isStage3 && stage3FlickerDisabled) {
+            vignette.setFlicker(true);
+            stage3FlickerDisabled = false;
+        }
+    }
+
+    private boolean shouldRunMonsterLogicThisFrame(int monsterIndex) {
+        if (!stage3ChaseStarted) {
+            return true;
+        }
+        // Keep bosses fully responsive; stagger other enemies to reduce collision/path CPU.
+        Entity entity = monster[monsterIndex];
+        if (entity instanceof MON_Stage3BossMomo || entity instanceof MON_Stage2WitherBoss) {
+            return true;
+        }
+        return (monsterIndex & 1) == stage3EnemyUpdateFrameBucket;
     }
 
     public void increaseVolume() {

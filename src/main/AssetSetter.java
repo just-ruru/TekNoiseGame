@@ -13,6 +13,9 @@ import java.awt.Point;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -43,6 +46,20 @@ public class AssetSetter {
 
         // Default to stage 01 layout.
         setStage01Objects();
+    }
+    
+    private InputStream openMapStream(String mapPath) {
+        // Prefer map files from project's res/ folder so live map edits are used.
+        try {
+            String relativePath = mapPath.startsWith("/") ? mapPath.substring(1) : mapPath;
+            Path diskPath = Paths.get("res").resolve(relativePath);
+            if (Files.exists(diskPath)) {
+                return Files.newInputStream(diskPath);
+            }
+        } catch (Exception ignored) {
+        }
+        // Fallback to classpath resources.
+        return getClass().getResourceAsStream(mapPath);
     }
 
     private void setStage01Objects() {
@@ -108,7 +125,10 @@ public class AssetSetter {
         List<Point> candleTiles = new ArrayList<>();
 
         try {
-            InputStream is = getClass().getResourceAsStream("/maps/stage02.txt");
+            InputStream is = openMapStream("/maps/stage02.txt");
+            if (is == null) {
+                throw new IllegalStateException("Missing map: /maps/stage02.txt");
+            }
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
             String line;
@@ -133,6 +153,8 @@ public class AssetSetter {
                         objectIndex = addObject(objectIndex, new NPC_JhonPorkJerkyJake(), col, row);
                     } else if ("N".equalsIgnoreCase(token)) {
                         candleTiles.add(new Point(col, row));
+                    } else if ("XX".equalsIgnoreCase(token)) {
+                        objectIndex = addObject(objectIndex, new OBJ_HauntingEnergyHint(), col, row);
                     }
                 }
                 row++;
@@ -174,10 +196,12 @@ public class AssetSetter {
         boolean doorPlaced = false;
         List<Point> candleTiles = new ArrayList<>();
         List<Point> breakableTableTiles = new ArrayList<>();
-        List<Point> cutsceneBreakTiles = new ArrayList<>();
 
         try {
-            InputStream is = getClass().getResourceAsStream("/maps/stage03.txt");
+            InputStream is = openMapStream("/maps/stage03.txt");
+            if (is == null) {
+                throw new IllegalStateException("Missing map: /maps/stage03.txt");
+            }
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
             String line;
@@ -196,8 +220,6 @@ public class AssetSetter {
                         objectIndex = addObject(objectIndex, new OBJ_HealthBag(), col, row);
                     } else if ("N".equalsIgnoreCase(token)) {
                         candleTiles.add(new Point(col, row));
-                    } else if ("XX".equalsIgnoreCase(token)) {
-                        cutsceneBreakTiles.add(new Point(col, row));
                     } else if ("X".equalsIgnoreCase(token)) {
                         breakableTableTiles.add(new Point(col, row));
                     }
@@ -219,11 +241,6 @@ public class AssetSetter {
         int tableVariant = 1;
         for (Point tile : breakableTableTiles) {
             objectIndex = addObject(objectIndex, new OBJ_BreakableTable(tableVariant), tile.x, tile.y);
-            tableVariant = tableVariant % 4 + 1;
-        }
-
-        for (Point tile : cutsceneBreakTiles) {
-            objectIndex = addObject(objectIndex, new OBJ_CutsceneBreakable(tableVariant), tile.x, tile.y);
             tableVariant = tableVariant % 4 + 1;
         }
     }
@@ -275,19 +292,35 @@ public class AssetSetter {
 
     private void setStage02Monsters() {
         Point bossTile = findMapMarker("/maps/stage02.txt", "S");
-        if (bossTile == null) {
+        if (bossTile != null) {
+            gp.monster[0] = new MON_Stage2WitherBoss(gp);
+            gp.monster[0].stageX = gp.tileSize * bossTile.x;
+            gp.monster[0].stageY = gp.tileSize * bossTile.y;
+        } else {
             System.out.println("Warning: stage02 boss marker S not found.");
-            return;
         }
 
-        gp.monster[0] = new MON_Stage2WitherBoss(gp);
-        gp.monster[0].stageX = gp.tileSize * bossTile.x;
-        gp.monster[0].stageY = gp.tileSize * bossTile.y;
+        // Add phantom enemies (from stage 1) based on 'E' placeholders in map order.
+        List<Point> enemyTiles = findMapMarkers("/maps/stage02.txt", "E");
+        int monsterIndex = 1;
+        int variant = 1;
+        for (Point tile : enemyTiles) {
+            if (monsterIndex < gp.monster.length) {
+                gp.monster[monsterIndex] = new MON_Dementor(gp, variant);
+                gp.monster[monsterIndex].stageX = tile.x * gp.tileSize;
+                gp.monster[monsterIndex].stageY = tile.y * gp.tileSize;
+                monsterIndex++;
+                variant = (variant % 4) + 1; // Variants 1-4
+            }
+        }
     }
 
     public Point findMapMarker(String mapPath, String marker) {
         try {
-            InputStream is = getClass().getResourceAsStream(mapPath);
+            InputStream is = openMapStream(mapPath);
+            if (is == null) {
+                throw new IllegalStateException("Missing map: " + mapPath);
+            }
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
             String line;
             int row = 0;
@@ -311,7 +344,10 @@ public class AssetSetter {
     public List<Point> findMapMarkers(String mapPath, String marker) {
         List<Point> markers = new ArrayList<>();
         try {
-            InputStream is = getClass().getResourceAsStream(mapPath);
+            InputStream is = openMapStream(mapPath);
+            if (is == null) {
+                throw new IllegalStateException("Missing map: " + mapPath);
+            }
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
             String line;
             int row = 0;

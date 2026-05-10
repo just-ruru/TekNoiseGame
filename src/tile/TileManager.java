@@ -9,12 +9,18 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 public class TileManager {
 
     GamePanel gp;
     public Tile[] tile;
     public int mapTileNum[][];
+    
+    // Stage 3 barrier that is drawn from the map token "XX".
+    public static final int STAGE3_BARRIER_TILE_ID = 15;
     private String currentMapPath = "/maps/stage01.txt";
     private MapConfig currentMapConfig;
 
@@ -109,6 +115,11 @@ public class TileManager {
             tile[14] = new Tile();
             tile[14].image = ImageIO.read(getClass().getResourceAsStream("/tiles/Board2.png"));
             tile[14].collision = true;
+            
+            tile[STAGE3_BARRIER_TILE_ID] = new Tile();
+            // Use existing tile art (tile 2) so the XX barrier always appears.
+            tile[STAGE3_BARRIER_TILE_ID].image = ImageIO.read(getClass().getResourceAsStream("/tiles/2.png"));
+            tile[STAGE3_BARRIER_TILE_ID].collision = true;
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -117,6 +128,7 @@ public class TileManager {
     public void loadMap(String mapPath) {
         currentMapPath = mapPath;
         currentMapConfig = MapConfig.getConfigForMap(mapPath, gp.tileSize);
+        int xxCount = 0;
         
         // Resize the map array if needed
         if (mapTileNum == null || mapTileNum.length != currentMapConfig.maxStageCol || 
@@ -125,7 +137,20 @@ public class TileManager {
         }
         
         try {
-            InputStream is = getClass().getResourceAsStream(mapPath);
+            // Prefer map files from project's res/ folder so live map edits are used.
+            InputStream is = null;
+            String relativePath = mapPath.startsWith("/") ? mapPath.substring(1) : mapPath;
+            Path diskPath = Paths.get("res").resolve(relativePath);
+            if (Files.exists(diskPath)) {
+                is = Files.newInputStream(diskPath);
+            }
+            if (is == null) {
+                // Fallback to classpath resources.
+                is = getClass().getResourceAsStream(mapPath);
+            }
+            if (is == null) {
+                throw new IOException("Map not found on classpath or disk: " + mapPath);
+            }
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
 
             int col = 0;
@@ -145,6 +170,9 @@ public class TileManager {
                     }
 
                     int num = parseMapToken(token, col, row);
+                    if ("XX".equalsIgnoreCase(token)) {
+                        xxCount++;
+                    }
 
                     if (num >= 0 && num < tile.length) { // Bounds check against tile[]
                         mapTileNum[col][row] = num;
@@ -162,6 +190,13 @@ public class TileManager {
             }
 
             br.close();
+            
+            if ("/maps/stage03.txt".equals(mapPath)) {
+                System.out.println("Stage03 loadMap: XX tokens seen=" + xxCount + ", barrierTileId=" + STAGE3_BARRIER_TILE_ID);
+                if (tile[STAGE3_BARRIER_TILE_ID] == null || tile[STAGE3_BARRIER_TILE_ID].image == null) {
+                    System.out.println("Stage03 loadMap: WARNING barrier tile image is missing for tile[" + STAGE3_BARRIER_TILE_ID + "]");
+                }
+            }
 
         } catch (Exception e) {
             e.printStackTrace(); // Don't silently swallow errors
@@ -180,9 +215,14 @@ public class TileManager {
             case "S":
             case "S2":
             case "X":
-            case "XX":
             case "Y":
+            case "Z":
                 return 0;
+            case "XX":
+                if ("/maps/stage02.txt".equals(currentMapPath)) {
+                    return 0; // AssetSetter will place OBJ_HauntingEnergyHint here
+                }
+                return STAGE3_BARRIER_TILE_ID;
         }
 
         try {

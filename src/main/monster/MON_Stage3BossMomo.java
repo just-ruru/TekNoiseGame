@@ -12,12 +12,15 @@ import java.util.Random;
 
 public class MON_Stage3BossMomo extends Entity {
     private static final int DETECTION_RANGE = 8;
-    private static final float CHASE_SPEED = 1.15f;
-    private static final float WANDER_SPEED = 0.7f;
+    private static final float CHASE_SPEED = 1.8f;
+    private static final float WANDER_SPEED = 1.2f;
     private static final int WANDER_TURN_TICKS = 120;
     private static final int DRAW_SIZE_TILES = 3;
+    private static final int CHASE_PATH_RECALC_TICKS = 6;
     private final Random random = new Random();
     private boolean forceChase = false;
+    private int chasePathRecalcCounter = 0;
+    private String cachedChaseDirection = null;
 
     public MON_Stage3BossMomo(GamePanel gp) {
         super(gp);
@@ -66,9 +69,15 @@ public class MON_Stage3BossMomo extends Entity {
 
         if (forceChase || tileDistance <= DETECTION_RANGE) {
             speed = CHASE_SPEED;
-            String pathDirection = findPathDirectionToPlayer();
-            if (pathDirection != null) {
-                direction = pathDirection;
+            if (chasePathRecalcCounter <= 0 || cachedChaseDirection == null) {
+                cachedChaseDirection = findPathDirectionToPlayer();
+                chasePathRecalcCounter = CHASE_PATH_RECALC_TICKS;
+            } else {
+                chasePathRecalcCounter--;
+            }
+
+            if (cachedChaseDirection != null) {
+                direction = cachedChaseDirection;
                 return;
             }
 
@@ -81,6 +90,8 @@ public class MON_Stage3BossMomo extends Entity {
         }
 
         speed = WANDER_SPEED;
+        cachedChaseDirection = null;
+        chasePathRecalcCounter = 0;
         actionLockCounter++;
         if (actionLockCounter >= WANDER_TURN_TICKS) {
             int value = random.nextInt(4);
@@ -111,7 +122,13 @@ public class MON_Stage3BossMomo extends Entity {
 
             BufferedImage image = getCurrentImage();
             if (image != null) {
+                java.awt.Composite oldComposite = g2.getComposite();
+                float alpha = getDrawAlpha();
+                if (alpha < 1f) {
+                    g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, alpha));
+                }
                 g2.drawImage(image, screenX, screenY, drawSize, drawSize, null);
+                g2.setComposite(oldComposite);
             }
         }
     }

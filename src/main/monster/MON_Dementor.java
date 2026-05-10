@@ -9,13 +9,14 @@ public class MON_Dementor extends Entity {
 
     private int imageVariant;
     private static final int DETECTION_RANGE = 3; // tiles (reduced from 5)
-    private static final float CHASE_SPEED = 1.5f;
+    private static final float STAGE3_CHASE_SPEED = 2.5f;
     private static final float WANDER_SPEED = 1f;
     
     private int originalX = -1;
     private int originalY = -1;
     private static final int WANDER_RADIUS = 3; // tiles
     private boolean forceChase = false;
+    private final Random random = new Random();
 
     public MON_Dementor(GamePanel gp, int imageVariant) {
         super(gp);
@@ -65,7 +66,7 @@ public class MON_Dementor extends Entity {
             case 3: // gemal
                 up1 = setup("/monster/gemal_down1");
                 up2 = setup("/monster/gemal_down2");
-                down1 = setup("/monster/gemal_down1");;
+                down1 = setup("/monster/gemal_down1");
                 down2 = setup("/monster/gemal_down2");
                 left1 = setup("/monster/gemal_down1");
                 left2 = setup("/monster/gemal_down2");
@@ -111,9 +112,10 @@ public class MON_Dementor extends Entity {
         int distanceY = Math.abs(stageY - playerY);
         int tileDistance = (distanceX + distanceY) / gp.tileSize;
 
+
+
         if (forceChase || tileDistance <= DETECTION_RANGE) {
             // Player detected - chase mode
-            speed = CHASE_SPEED;
 
             // Determine direction to chase player
             int deltaX = playerX - stageX;
@@ -135,7 +137,6 @@ public class MON_Dementor extends Entity {
             }
         } else {
             // Player not detected
-            speed = WANDER_SPEED;
 
             int distToOriginalX = Math.abs(stageX - originalX);
             int distToOriginalY = Math.abs(stageY - originalY);
@@ -163,7 +164,6 @@ public class MON_Dementor extends Entity {
                 // if within wander radius of our spawn point, freely wander
                 actionLockCounter++;
                 if(actionLockCounter == 120) {
-                    Random random = new Random();
                     int i = random.nextInt(100) + 1;
 
                     if(i <= 25) {
@@ -187,6 +187,6 @@ public class MON_Dementor extends Entity {
 
     public void activateForStage3Chase() {
         forceChase = true;
-        speed = CHASE_SPEED;
+        speed = STAGE3_CHASE_SPEED;
     }
 }

@@ -40,6 +40,16 @@ public class MouseHandler extends MouseAdapter {
             return;
         }
 
+        if (gp.gameState == gp.titleSettingsState && gp.ui.handleSettingsClickAt(gamePoint.x, gamePoint.y)) {
+            gp.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            return;
+        }
+
+        if (gp.gameState == gp.titleLoadState && gp.ui.handleLoadClickAt(gamePoint.x, gamePoint.y)) {
+            gp.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            return;
+        }
+
         if (gp.gameState == gp.characterSelectState && gp.ui.handleCharacterSelectionClickAt(gamePoint.x, gamePoint.y)) {
             gp.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             return;
@@ -57,7 +67,7 @@ public class MouseHandler extends MouseAdapter {
     }
 
     private void updateTitleHover(MouseEvent e) {
-        if (gp.gameState != gp.titleState && gp.gameState != gp.characterSelectState && gp.gameState != gp.gameOverState) {
+        if (gp.gameState != gp.titleState && gp.gameState != gp.characterSelectState && gp.gameState != gp.gameOverState && gp.gameState != gp.titleSettingsState && gp.gameState != gp.titleLoadState) {
             gp.setCursor(Cursor.getDefaultCursor());
             return;
         }
@@ -67,6 +77,10 @@ public class MouseHandler extends MouseAdapter {
         if (gamePoint != null) {
             if (gp.gameState == gp.titleState) {
                 hoveringButton = gp.ui.selectTitleCommandAt(gamePoint.x, gamePoint.y);
+            } else if (gp.gameState == gp.titleSettingsState) {
+                hoveringButton = gp.ui.selectSettingsOptionAt(gamePoint.x, gamePoint.y);
+            } else if (gp.gameState == gp.titleLoadState) {
+                hoveringButton = gp.ui.selectLoadOptionAt(gamePoint.x, gamePoint.y);
             } else if (gp.gameState == gp.characterSelectState) {
                 hoveringButton = gp.ui.updateCharacterHoverAt(gamePoint.x, gamePoint.y);
             } else if (gp.gameState == gp.gameOverState) {

@@ -10,7 +10,9 @@ public class MON_Stage2WitherBoss extends Entity {
     private static final float CHASE_SPEED = 0.9f;
     private static final float WANDER_SPEED = 0.55f;
     private static final int DETECTION_RANGE = 5;
-    private static final int SUMMON_INTERVAL_TICKS = 180;
+    private static final int STAGE2_WANDER_ROW_INDEX = 2;
+    private static final int SUMMON_INTERVAL_TICKS = 300;
+    private static final int CHASE_PATH_RECALC_TICKS = 6;
     private static final int RETURN_TO_DOOR_INTERVAL_TICKS = 420;
     private static final int RETURN_TO_DOOR_DURATION_TICKS = 240;
     private static final int DOOR_ARRIVAL_DISTANCE_TILES = 1;
@@ -22,6 +24,8 @@ public class MON_Stage2WitherBoss extends Entity {
     private int returnToDoorTicks = 0;
     private boolean returningToDoor = false;
     private final Random random = new Random();
+    private int chasePathRecalcCounter = 0;
+    private String cachedChaseDirection = null;
 
     public MON_Stage2WitherBoss(GamePanel gp) {
         super(gp);
@@ -93,9 +97,14 @@ public class MON_Stage2WitherBoss extends Entity {
             returningToDoor = false;
             returnToDoorTicks = 0;
             speed = CHASE_SPEED;
-            String pathDirection = findPathDirectionToPlayer();
-            if (pathDirection != null) {
-                direction = pathDirection;
+            if (chasePathRecalcCounter <= 0 || cachedChaseDirection == null) {
+                cachedChaseDirection = findPathDirectionToPlayer();
+                chasePathRecalcCounter = CHASE_PATH_RECALC_TICKS;
+            } else {
+                chasePathRecalcCounter--;
+            }
+            if (cachedChaseDirection != null) {
+                direction = cachedChaseDirection;
                 return;
             }
 
@@ -108,16 +117,26 @@ public class MON_Stage2WitherBoss extends Entity {
         }
 
         speed = WANDER_SPEED;
-        if (updateReturnToDoorBehavior()) {
+        cachedChaseDirection = null;
+        chasePathRecalcCounter = 0;
+        if (moveBackToWanderRowIfNeeded()) {
             return;
         }
 
         actionLockCounter++;
         if (actionLockCounter >= 120) {
-            int value = random.nextInt(4);
-            direction = value == 0 ? "up" : value == 1 ? "down" : value == 2 ? "left" : "right";
+            direction = random.nextBoolean() ? "left" : "right";
             actionLockCounter = 0;
         }
+    }
+
+    private boolean moveBackToWanderRowIfNeeded() {
+        int currentRow = getCenterStageY() / gp.tileSize;
+        if (currentRow == STAGE2_WANDER_ROW_INDEX) {
+            return false;
+        }
+        direction = currentRow < STAGE2_WANDER_ROW_INDEX ? "down" : "up";
+        return true;
     }
 
     private boolean updateReturnToDoorBehavior() {
@@ -184,6 +203,7 @@ public class MON_Stage2WitherBoss extends Entity {
             return;
         }
         if (!firstSummonDone) {
+            System.out.println("[BOSS] Performing initial summon of 5 minions");
             gp.spawnStage2Minions(stageX, stageY, 5);
             firstSummonDone = true;
             summonCounter = 0;
@@ -192,6 +212,7 @@ public class MON_Stage2WitherBoss extends Entity {
 
         summonCounter++;
         if (summonCounter >= SUMMON_INTERVAL_TICKS) {
+            System.out.println("[BOSS] Performing periodic summon (interval reached: " + summonCounter + "/" + SUMMON_INTERVAL_TICKS + ")");
             gp.spawnStage2Minions(stageX, stageY, 1);
             summonCounter = 0;
         }
