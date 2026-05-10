@@ -42,6 +42,12 @@ public class MouseHandler extends MouseAdapter {
 
         if (gp.gameState == gp.characterSelectState && gp.ui.handleCharacterSelectionClickAt(gamePoint.x, gamePoint.y)) {
             gp.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            return;
+        }
+
+        if (gp.gameState == gp.gameOverState && gp.ui.activateGameOverCommandAt(gamePoint.x, gamePoint.y)) {
+            gp.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            return;
         }
     }
 
@@ -51,7 +57,7 @@ public class MouseHandler extends MouseAdapter {
     }
 
     private void updateTitleHover(MouseEvent e) {
-        if (gp.gameState != gp.titleState && gp.gameState != gp.characterSelectState) {
+        if (gp.gameState != gp.titleState && gp.gameState != gp.characterSelectState && gp.gameState != gp.gameOverState) {
             gp.setCursor(Cursor.getDefaultCursor());
             return;
         }
@@ -63,6 +69,8 @@ public class MouseHandler extends MouseAdapter {
                 hoveringButton = gp.ui.selectTitleCommandAt(gamePoint.x, gamePoint.y);
             } else if (gp.gameState == gp.characterSelectState) {
                 hoveringButton = gp.ui.updateCharacterHoverAt(gamePoint.x, gamePoint.y);
+            } else if (gp.gameState == gp.gameOverState) {
+                hoveringButton = gp.ui.selectGameOverCommandAt(gamePoint.x, gamePoint.y);
             }
         } else if (gp.gameState == gp.characterSelectState) {
             gp.ui.updateCharacterHoverAt(-1, -1);

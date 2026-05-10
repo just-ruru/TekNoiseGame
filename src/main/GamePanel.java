@@ -92,6 +92,7 @@ public class GamePanel extends JPanel implements Runnable{
     public final int cutsceneState = 4;
     public final int introCutsceneState = 5;
     public final int characterSelectState = 6;
+    public final int gameOverState = 7;
     private static final int TRANSITION_NONE = 0;
     private static final int TRANSITION_MAP = 1;
     private static final int TRANSITION_TITLE_START = 2;
@@ -489,12 +490,15 @@ public class GamePanel extends JPanel implements Runnable{
         if (gameState == transitionState) {
             updateTransition();
         }
+        if (gameState == gameOverState) {
+            // Wait for input to restart or go back to menu, handled via UI.update() and MouseHandler
+        }
         ui.update();
         if (gameState == cutsceneState && ui.isDialogueActive() && keyH.interactPressed) {
             ui.advanceDialogue();
             keyH.interactPressed = false;
         }
-        if (gameState != playState && gameState != cutsceneState && gameState != introCutsceneState) {
+        if (gameState != playState && gameState != cutsceneState && gameState != introCutsceneState && gameState != gameOverState) {
             if (pendingReturnToTitleAfterDialogue && !ui.isDialogueActive()) {
                 pendingReturnToTitleAfterDialogue = false;
                 currentMapPath = "/maps/stage01.txt";
@@ -504,7 +508,7 @@ public class GamePanel extends JPanel implements Runnable{
                 setupGame();
             }
         }
-        if (gameState != playState && gameState != cutsceneState) {
+        if (gameState != playState && gameState != cutsceneState && gameState != gameOverState) {
             checkEnemyProximityDimming();
             vignette.update();
         }
@@ -1778,6 +1782,21 @@ public class GamePanel extends JPanel implements Runnable{
         gameX = Math.max(0, Math.min(screenWidth - 1, gameX));
         gameY = Math.max(0, Math.min(screenHeight - 1, gameY));
         return new Point(gameX, gameY);
+    }
+
+    // restarts the current map (for Game Over)
+    public void retryCurrentMap() {
+        // Stop any current action, just set game state to transition
+        fadeAlpha = 0f;
+        fadeOutPhase = true;
+        activeTransitionType = TRANSITION_MAP;
+        nextMapPath = currentMapPath; // reload same map
+        showTitleDuringTransition = false;
+        transitionHoldTicks = 0;
+        gameState = transitionState;
+        
+        // Also reset player life properly since it's 0
+        player.life = player.maxLife;
     }
 
 }

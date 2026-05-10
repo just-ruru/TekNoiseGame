@@ -54,6 +54,13 @@ public class UI {
     private long activePromptExpiresAt = 0L;
     public int commandNum = 0;
 
+    // Game Over images
+    private BufferedImage gameOverTextImg;
+    private BufferedImage gameOverTryAgainImg;
+    private BufferedImage gameOverBackToMenuImg;
+    private Rectangle gameOverTryAgainBounds;
+    private Rectangle gameOverBackToMenuBounds;
+
     public UI(GamePanel gp) {
         this.gp = gp;
 
@@ -102,6 +109,40 @@ public class UI {
         characterAnchorXs = createCharacterAnchorXs();
         characterDownFrames = loadCharacterDownFrames();
         characterSelectionTitleFont = new Font("Monospaced", Font.BOLD, 36);
+
+        // Load Game Over images
+        gameOverTextImg = loadMenuImage("/gameover/YouDied.png");
+        gameOverTryAgainImg = loadMenuImage("/gameover/Try Again.png");
+        gameOverBackToMenuImg = loadMenuImage("/gameover/BackToMenu.png");
+
+        if (gameOverTextImg != null) {
+            double scale = Math.min((double) gp.screenWidth / gameOverTextImg.getWidth(), (double) (gp.screenHeight / 2) / gameOverTextImg.getHeight());
+            int newWidth = (int) Math.round(gameOverTextImg.getWidth() * scale * 0.8);
+            int newHeight = (int) Math.round(gameOverTextImg.getHeight() * scale * 0.8);
+            gameOverTextImg = utilityTool.scaleImage(gameOverTextImg, newWidth, newHeight);
+        }
+
+        if (gameOverTryAgainImg != null) {
+            double scale = Math.min((double) gp.screenWidth / gameOverTryAgainImg.getWidth(), (double) gp.screenHeight / gameOverTryAgainImg.getHeight());
+            int newWidth = (int) Math.round(gameOverTryAgainImg.getWidth() * scale * 0.35);
+            int newHeight = (int) Math.round(gameOverTryAgainImg.getHeight() * scale * 0.35);
+            gameOverTryAgainImg = utilityTool.scaleImage(gameOverTryAgainImg, newWidth, newHeight);
+            gameOverTryAgainBounds = new Rectangle((gp.screenWidth - newWidth) / 2, gp.screenHeight / 2 + 50, newWidth, newHeight);
+        } else {
+            gameOverTryAgainImg = createFallbackTitleButton("TRY AGAIN");
+            gameOverTryAgainBounds = new Rectangle((gp.screenWidth - TITLE_BUTTON_WIDTH) / 2, gp.screenHeight / 2 + 50, TITLE_BUTTON_WIDTH, TITLE_BUTTON_HEIGHT);
+        }
+
+        if (gameOverBackToMenuImg != null) {
+            double scale = Math.min((double) gp.screenWidth / gameOverBackToMenuImg.getWidth(), (double) gp.screenHeight / gameOverBackToMenuImg.getHeight());
+            int newWidth = (int) Math.round(gameOverBackToMenuImg.getWidth() * scale * 0.35);
+            int newHeight = (int) Math.round(gameOverBackToMenuImg.getHeight() * scale * 0.35);
+            gameOverBackToMenuImg = utilityTool.scaleImage(gameOverBackToMenuImg, newWidth, newHeight);
+            gameOverBackToMenuBounds = new Rectangle((gp.screenWidth - newWidth) / 2, gp.screenHeight / 2 + 50 + gameOverTryAgainBounds.height + 20, newWidth, newHeight);
+        } else {
+            gameOverBackToMenuImg = createFallbackTitleButton("BACK TO MENU");
+            gameOverBackToMenuBounds = new Rectangle((gp.screenWidth - TITLE_BUTTON_WIDTH) / 2, gp.screenHeight / 2 + 50 + TITLE_BUTTON_HEIGHT + 20, TITLE_BUTTON_WIDTH, TITLE_BUTTON_HEIGHT);
+        }
     }
 
     public void showMessage(String text) {
@@ -149,9 +190,71 @@ public class UI {
             drawPauseScreen();
         }
 
+        if (gp.gameState == gp.gameOverState) {
+            drawGameOverScreen();
+        }
+
         dialogueBox.draw(g2);
         gp.devSettings.draw(g2);
     }
+
+    public void drawGameOverScreen() {
+        g2.setColor(new Color(0, 0, 0, 150)); // semi-transparent black overlay
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+
+        int textWidth = gameOverTextImg != null ? gameOverTextImg.getWidth() : 300;
+        int textHeight = gameOverTextImg != null ? gameOverTextImg.getHeight() : 100;
+        int textX = (gp.screenWidth - textWidth) / 2;
+        int textY = gp.screenHeight / 3 - textHeight / 2;
+
+        if (gameOverTextImg != null) {
+            g2.drawImage(gameOverTextImg, textX, textY, null);
+        } else {
+            String text = "YOU DIED";
+            int x = getXforCenteredText(text);
+            int y = gp.screenHeight / 3;
+            g2.drawString(text, x, y);
+        }
+
+        drawTitleButton(gameOverTryAgainImg, gameOverTryAgainBounds, commandNum == 0);
+        drawTitleButton(gameOverBackToMenuImg, gameOverBackToMenuBounds, commandNum == 1);
+    }
+
+    public void moveGameOverSelection(int delta) {
+        commandNum = Math.floorMod(commandNum + delta, 2);
+    }
+
+    public boolean selectGameOverCommandAt(int x, int y) {
+        if (gameOverTryAgainBounds.contains(x, y)) {
+            commandNum = 0;
+            return true;
+        }
+        if (gameOverBackToMenuBounds.contains(x, y)) {
+            commandNum = 1;
+            return true;
+        }
+        return false;
+    }
+
+    public boolean activateGameOverCommandAt(int x, int y) {
+        if (!selectGameOverCommandAt(x, y)) {
+            return false;
+        }
+        activateSelectedGameOverCommand();
+        return true;
+    }
+
+    public void activateSelectedGameOverCommand() {
+        if (commandNum == 0) {
+            // Try Again
+            gp.retryCurrentMap();
+        } else if (commandNum == 1) {
+            // Back to Menu
+            gp.gameState = gp.titleState;
+            gp.playMusic(1);
+        }
+    }
+
 
     public void drawTitleScreen() {
         g2.setColor(Color.BLACK);

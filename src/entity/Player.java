@@ -214,6 +214,12 @@ public class Player extends Entity{
     }
 
     public void update(){
+        if (life <= 0) {
+            gp.gameState = gp.gameOverState;
+            gp.stopMusic();
+            return;
+        }
+    
         if (gp.ui.isDialogueActive()) {
             if (keyH.interactPressed) {
                 gp.ui.advanceDialogue();
@@ -907,4 +913,3 @@ public class Player extends Entity{
 //        g2.drawString("Invincible: " + invincibleCounter, 10, 400);
     }
 }
-
