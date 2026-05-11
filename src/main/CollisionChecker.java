@@ -36,8 +36,19 @@ public class CollisionChecker {
                     entity.collisionOn = true;
                     break;
                 }
-                tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityTopRow];
-                tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityTopRow];
+                // Additional bounds check before array access
+                if (entityLeftCol >= 0 && entityLeftCol < gp.maxStageCol && 
+                    entityTopRow >= 0 && entityTopRow < gp.maxStageRow) {
+                    tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityTopRow];
+                } else {
+                    tileNum1 = 0; // Default to non-collision tile
+                }
+                if (entityRightCol >= 0 && entityRightCol < gp.maxStageCol && 
+                    entityTopRow >= 0 && entityTopRow < gp.maxStageRow) {
+                    tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityTopRow];
+                } else {
+                    tileNum2 = 0; // Default to non-collision tile
+                }
                 checkTileCollision(entity, tileNum1, tileNum2);
                 break;
 
@@ -47,8 +58,19 @@ public class CollisionChecker {
                     entity.collisionOn = true;
                     break;
                 }
-                tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityBottomRow];
-                tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityBottomRow];
+                // Additional bounds check before array access
+                if (entityLeftCol >= 0 && entityLeftCol < gp.maxStageCol && 
+                    entityBottomRow >= 0 && entityBottomRow < gp.maxStageRow) {
+                    tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityBottomRow];
+                } else {
+                    tileNum1 = 0; // Default to non-collision tile
+                }
+                if (entityRightCol >= 0 && entityRightCol < gp.maxStageCol && 
+                    entityBottomRow >= 0 && entityBottomRow < gp.maxStageRow) {
+                    tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityBottomRow];
+                } else {
+                    tileNum2 = 0; // Default to non-collision tile
+                }
                 checkTileCollision(entity, tileNum1, tileNum2);
                 break;
 
@@ -58,8 +80,19 @@ public class CollisionChecker {
                     entity.collisionOn = true;
                     break;
                 }
-                tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityTopRow];
-                tileNum2 = gp.tileM.mapTileNum[entityLeftCol][entityBottomRow];
+                // Additional bounds check before array access
+                if (entityLeftCol >= 0 && entityLeftCol < gp.maxStageCol && 
+                    entityTopRow >= 0 && entityTopRow < gp.maxStageRow) {
+                    tileNum1 = gp.tileM.mapTileNum[entityLeftCol][entityTopRow];
+                } else {
+                    tileNum1 = 0; // Default to non-collision tile
+                }
+                if (entityLeftCol >= 0 && entityLeftCol < gp.maxStageCol && 
+                    entityBottomRow >= 0 && entityBottomRow < gp.maxStageRow) {
+                    tileNum2 = gp.tileM.mapTileNum[entityLeftCol][entityBottomRow];
+                } else {
+                    tileNum2 = 0; // Default to non-collision tile
+                }
                 checkTileCollision(entity, tileNum1, tileNum2);
                 break;
 
@@ -69,8 +102,19 @@ public class CollisionChecker {
                     entity.collisionOn = true;
                     break;
                 }
-                tileNum1 = gp.tileM.mapTileNum[entityRightCol][entityTopRow];
-                tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityBottomRow];
+                // Additional bounds check before array access
+                if (entityRightCol >= 0 && entityRightCol < gp.maxStageCol && 
+                    entityTopRow >= 0 && entityTopRow < gp.maxStageRow) {
+                    tileNum1 = gp.tileM.mapTileNum[entityRightCol][entityTopRow];
+                } else {
+                    tileNum1 = 0; // Default to non-collision tile
+                }
+                if (entityRightCol >= 0 && entityRightCol < gp.maxStageCol && 
+                    entityBottomRow >= 0 && entityBottomRow < gp.maxStageRow) {
+                    tileNum2 = gp.tileM.mapTileNum[entityRightCol][entityBottomRow];
+                } else {
+                    tileNum2 = 0; // Default to non-collision tile
+                }
                 checkTileCollision(entity, tileNum1, tileNum2);
                 break;
         }

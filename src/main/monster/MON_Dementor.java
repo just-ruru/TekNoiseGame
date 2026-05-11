@@ -1,33 +1,25 @@
 package main.monster;
 
-import entity.Entity;
+import entity.Monster;
 import main.GamePanel;
 
-import java.util.Random;
-
-public class MON_Dementor extends Entity {
+public class MON_Dementor extends Monster {
 
     private int imageVariant;
-    private static final int DETECTION_RANGE = 3; // tiles (reduced from 5)
-    private static final float STAGE3_CHASE_SPEED = 2.5f;
-    private static final float WANDER_SPEED = 1f;
-    
-    private int originalX = -1;
-    private int originalY = -1;
-    private static final int WANDER_RADIUS = 3; // tiles
     private boolean forceChase = false;
-    private final Random random = new Random();
+    private static final float STAGE3_CHASE_SPEED = 2.5f;
 
     public MON_Dementor(GamePanel gp, int imageVariant) {
         super(gp);
-
+        
         this.imageVariant = imageVariant;
-        type = 1;
         name = "Dementor";
-        speed = WANDER_SPEED;
         maxLife = 4;
         life = maxLife;
         direction = "down";
+
+        // Initialize monster properties using the abstract class method
+        initializeMonster(3, 1f, 1f, 3); // detectionRange, wanderSpeed, chaseSpeed, wanderRadius
 
         solidArea.x = 12;
         solidArea.y = 24;
@@ -36,10 +28,11 @@ public class MON_Dementor extends Entity {
         solidAreaDefaultX = solidArea.x;
         solidAreaDefaultY = solidArea.y;
 
-        getImage();
+        loadImages();
     }
 
-    public void getImage() {
+    @Override
+    protected void loadImages() {
         switch(imageVariant) {
             case 1: // cabo
                 up1 = setup("/monster/cabo_down1");
@@ -98,90 +91,14 @@ public class MON_Dementor extends Entity {
         }
     }
 
+    @Override
     public void setAction() {
-        if (originalX == -1 && originalY == -1) {
-            originalX = stageX;
-            originalY = stageY;
-        }
-
-        // Check if player is nearby
-        int playerX = gp.player.stageX;
-        int playerY = gp.player.stageY;
-
-        int distanceX = Math.abs(stageX - playerX);
-        int distanceY = Math.abs(stageY - playerY);
-        int tileDistance = (distanceX + distanceY) / gp.tileSize;
-
-
-
-        if (forceChase || tileDistance <= DETECTION_RANGE) {
-            // Player detected - chase mode
-
-            // Determine direction to chase player
-            int deltaX = playerX - stageX;
-            int deltaY = playerY - stageY;
-
-            // Prioritize the axis with greater distance
-            if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                if (deltaX > 0) {
-                    direction = "right";
-                } else {
-                    direction = "left";
-                }
-            } else {
-                if (deltaY > 0) {
-                    direction = "down";
-                } else {
-                    direction = "up";
-                }
-            }
+        if (forceChase) {
+            // Force chase mode - always chase player
+            enterChaseMode();
         } else {
-            // Player not detected
-
-            int distToOriginalX = Math.abs(stageX - originalX);
-            int distToOriginalY = Math.abs(stageY - originalY);
-            int tileDistToOriginal = (distToOriginalX + distToOriginalY) / gp.tileSize;
-            
-            // If the monster too far from original spawn, walk back
-            if (tileDistToOriginal > WANDER_RADIUS) {
-                int deltaX = originalX - stageX;
-                int deltaY = originalY - stageY;
-                
-                if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                    if (deltaX > 0) {
-                        direction = "right";
-                    } else {
-                        direction = "left";
-                    }
-                } else {
-                    if (deltaY > 0) {
-                        direction = "down";
-                    } else {
-                        direction = "up";
-                    }
-                }
-            } else {
-                // if within wander radius of our spawn point, freely wander
-                actionLockCounter++;
-                if(actionLockCounter == 120) {
-                    int i = random.nextInt(100) + 1;
-
-                    if(i <= 25) {
-                        direction = "up";
-                    }
-                    if(i > 25 && i <= 50) {
-                        direction = "down";
-                    }
-                    if(i > 50 && i <= 75) {
-                        direction = "left";
-                    }
-                    if(i > 75 && i < 100) {
-                        direction = "right";
-                    }
-
-                    actionLockCounter = 0;
-                }
-            }
+            // Use the default monster behavior from abstract class
+            updateMonsterBehavior();
         }
     }
 

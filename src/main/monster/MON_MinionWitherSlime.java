@@ -1,9 +1,9 @@
 package main.monster;
 
-import entity.Entity;
+import entity.Monster;
 import main.GamePanel;
 
-public class MON_MinionWitherSlime extends Entity {
+public class MON_MinionWitherSlime extends Monster {
     private static final int LIFE_TICKS = 600;
     private static final int FADE_TICKS = 6;
     private int lifeTicks = LIFE_TICKS;
@@ -13,8 +13,10 @@ public class MON_MinionWitherSlime extends Entity {
         super(gp);
         type = 2;
         name = "MinionWitherSlime";
-        speed = 2f;
         direction = "left";
+
+        // Initialize monster properties - this minion always chases player
+        initializeMonster(999, 2f, 2f, 0); // Large detection range, same speed, no wandering
 
         solidArea.x = 20;
         solidArea.y = 20;
@@ -23,6 +25,11 @@ public class MON_MinionWitherSlime extends Entity {
         solidAreaDefaultX = solidArea.x;
         solidAreaDefaultY = solidArea.y;
 
+        loadImages();
+    }
+
+    @Override
+    protected void loadImages() {
         left1 = setup("/monster/minionWitherSlime/Left/MiniWitherSlimeLeft1");
         left2 = setup("/monster/minionWitherSlime/Left/MiniWitherSlimeLeft2");
         left3 = setup("/monster/minionWitherSlime/Left/MiniWitherSlimeLeft3");
@@ -111,14 +118,8 @@ public class MON_MinionWitherSlime extends Entity {
 
     @Override
     public void setAction() {
-        int deltaX = gp.player.stageX - stageX;
-        int deltaY = gp.player.stageY - stageY;
-
-        if (Math.abs(deltaX) > Math.abs(deltaY)) {
-            direction = deltaX > 0 ? "right" : "left";
-        } else {
-            direction = deltaY > 0 ? "down" : "up";
-        }
+        // Minions always chase the player - use the abstract class method
+        enterChaseMode();
     }
 
     @Override

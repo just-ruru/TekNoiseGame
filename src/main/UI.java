@@ -695,26 +695,27 @@ public class UI {
             return;
         }
 
+        // Use MenuUtils to compute a consistent panel and option positions
         int panelWidth = gp.screenWidth / 2;
         int panelHeight = gp.tileSize * 8;
-        int panelX = (gp.screenWidth - panelWidth) / 2;
-        int panelY = (gp.screenHeight - panelHeight) / 2;
+        Rectangle panel = MenuUtils.panelRect(gp, panelWidth, panelHeight);
 
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
         g2.setColor(Color.BLACK);
-        g2.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+        g2.fillRoundRect(panel.x, panel.y, panel.width, panel.height, 12, 12);
 
         g2.setComposite(AlphaComposite.SrcOver);
         g2.setColor(Color.WHITE);
         g2.setStroke(new BasicStroke(3));
-        g2.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+        g2.drawRoundRect(panel.x, panel.y, panel.width, panel.height, 12, 12);
 
         g2.setFont(new Font("Monospaced", Font.BOLD, 28));
         int titleX = (gp.screenWidth - g2.getFontMetrics().stringWidth("LOAD GAME")) / 2;
-        g2.drawString("LOAD GAME", titleX, panelY + 50);
+        g2.drawString("LOAD GAME", titleX, panel.y + 50);
 
         g2.setFont(new Font("Monospaced", Font.BOLD, 18));
-        int optionY = panelY + 100;
+        int optionStartY = 100;
+        int optionY = panel.y + optionStartY;
         int lineHeight = 40;
 
         for (int i = 0; i < availableSaveFiles.size() && i < 5; i++) {
@@ -728,22 +729,22 @@ public class UI {
             }
 
             String displayText = saveName + " - " + mapName;
-            drawLoadOption(i, displayText, panelX, optionY);
+            drawLoadOption(i, displayText, panel.x, optionY);
             optionY += lineHeight;
         }
 
         if (availableSaveFiles.size() > 5) {
             g2.setColor(new Color(180, 180, 180));
-            g2.drawString("... and " + (availableSaveFiles.size() - 5) + " more", panelX + 28, optionY);
+            g2.drawString("... and " + (availableSaveFiles.size() - 5) + " more", panel.x + 28, optionY);
             optionY += lineHeight;
         }
 
         int backButtonIndex = Math.min(availableSaveFiles.size(), 5);
-        drawLoadOption(backButtonIndex, "Back", panelX, optionY + 20);
+        drawLoadOption(backButtonIndex, "Back", panel.x, optionY + 20);
 
         g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
         g2.setColor(new Color(210, 210, 210));
-        g2.drawString("W/S: Select   Enter: Load   Esc: Back", panelX + 24, panelY + panelHeight - 24);
+        g2.drawString("W/S: Select   Enter: Load   Esc: Back", panel.x + 24, panel.y + panel.height - 24);
 
         g2.setComposite(oldComposite);
         g2.setFont(oldFont);
@@ -768,24 +769,23 @@ public class UI {
 
         int panelWidth = (int) (gp.screenWidth * 0.7f);
         int panelHeight = gp.tileSize * 8;
-        int panelX = (gp.screenWidth - panelWidth) / 2;
-        int panelY = (gp.screenHeight - panelHeight) / 2;
+        Rectangle panel = MenuUtils.panelRect(gp, panelWidth, panelHeight);
 
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.85f));
         g2.setColor(Color.BLACK);
-        g2.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+        g2.fillRoundRect(panel.x, panel.y, panel.width, panel.height, 12, 12);
 
         g2.setComposite(AlphaComposite.SrcOver);
         g2.setColor(Color.WHITE);
         g2.setStroke(new BasicStroke(3));
-        g2.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+        g2.drawRoundRect(panel.x, panel.y, panel.width, panel.height, 12, 12);
 
         g2.setFont(new Font("Monospaced", Font.BOLD, 28));
         int titleX = (gp.screenWidth - g2.getFontMetrics().stringWidth("SAVE GAME")) / 2;
-        g2.drawString("SAVE GAME", titleX, panelY + 50);
+        g2.drawString("SAVE GAME", titleX, panel.y + 50);
 
         g2.setFont(new Font("Monospaced", Font.BOLD, 18));
-        int optionY = panelY + 100;
+        int optionY = panel.y + 100;
         int lineHeight = 40;
 
         // Draw save slots
@@ -817,16 +817,16 @@ public class UI {
                 displayText += " - Empty";
             }
             
-            drawSaveOption(i, displayText, panelX, optionY);
+            drawSaveOption(i, displayText, panel.x, optionY);
             optionY += lineHeight;
         }
 
         // Back button
-        drawSaveOption(SAVE_SLOT_NAMES.length, "Back", panelX, optionY + 20);
+        drawSaveOption(SAVE_SLOT_NAMES.length, "Back", panel.x, optionY + 20);
 
         g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
         g2.setColor(new Color(210, 210, 210));
-        g2.drawString("W/S: Select   Enter: Save   Esc: Back", panelX + 24, panelY + panelHeight - 24);
+        g2.drawString("W/S: Select   Enter: Save   Esc: Back", panel.x + 24, panel.y + panel.height - 24);
 
         g2.setComposite(oldComposite);
         g2.setFont(oldFont);
@@ -901,20 +901,16 @@ public class UI {
 
         int panelWidth = gp.screenWidth / 2;
         int panelHeight = gp.tileSize * 8;
-        int panelX = (gp.screenWidth - panelWidth) / 2;
-        int panelY = (gp.screenHeight - panelHeight) / 2;
-        int optionY = panelY + 100;
+        Rectangle panel = MenuUtils.panelRect(gp, panelWidth, panelHeight);
+        int optionStartY = 100;
+        int optionY = panel.y + optionStartY;
         int lineHeight = 40;
 
-        int optionHeight = 30;
-        int optionStartX = panelX + 28;
-        int optionEndX = panelX + panelWidth - 28;
-
-        // Check save file options
-        for (int i = 0; i < availableSaveFiles.size() && i < 5; i++) {
-            int optionTop = optionY - 20;
-            int optionBottom = optionY + 10;
-            if (x >= optionStartX && x <= optionEndX && y >= optionTop && y <= optionBottom) {
+        // Check save file options (up to 5 visible)
+        int visible = Math.min(availableSaveFiles.size(), 5);
+        for (int i = 0; i < visible; i++) {
+            Rectangle optRect = MenuUtils.optionRectForIndex(panel, i, optionStartY, lineHeight, 30);
+            if (optRect.contains(x, y)) {
                 loadGameSelectedIndex = i;
                 activateSelectedLoadOption();
                 return true;
@@ -924,9 +920,8 @@ public class UI {
 
         // Check back button
         int backButtonIndex = Math.min(availableSaveFiles.size(), 5);
-        int backOptionTop = optionY + 20 - 20;
-        int backOptionBottom = optionY + 20 + 10;
-        if (x >= optionStartX && x <= optionEndX && y >= backOptionTop && y <= backOptionBottom) {
+        Rectangle backRect = MenuUtils.optionRect(panel, optionY + 20, 30);
+        if (backRect.contains(x, y)) {
             loadGameSelectedIndex = backButtonIndex;
             activateSelectedLoadOption();
             return true;
@@ -946,20 +941,16 @@ public class UI {
 
         int panelWidth = gp.screenWidth / 2;
         int panelHeight = gp.tileSize * 8;
-        int panelX = (gp.screenWidth - panelWidth) / 2;
-        int panelY = (gp.screenHeight - panelHeight) / 2;
-        int optionY = panelY + 100;
+        Rectangle panel = MenuUtils.panelRect(gp, panelWidth, panelHeight);
+        int optionStartY = 100;
+        int optionY = panel.y + optionStartY;
         int lineHeight = 40;
 
-        int optionHeight = 30;
-        int optionStartX = panelX + 28;
-        int optionEndX = panelX + panelWidth - 28;
-
-        // Check save file options
-        for (int i = 0; i < availableSaveFiles.size() && i < 5; i++) {
-            int optionTop = optionY - 20;
-            int optionBottom = optionY + 10;
-            if (x >= optionStartX && x <= optionEndX && y >= optionTop && y <= optionBottom) {
+        // Check save file options (up to 5 visible)
+        int visible = Math.min(availableSaveFiles.size(), 5);
+        for (int i = 0; i < visible; i++) {
+            Rectangle optRect = MenuUtils.optionRectForIndex(panel, i, optionStartY, lineHeight, 30);
+            if (optRect.contains(x, y)) {
                 loadGameSelectedIndex = i;
                 return true;
             }
@@ -968,9 +959,8 @@ public class UI {
 
         // Check back button
         int backButtonIndex = Math.min(availableSaveFiles.size(), 5);
-        int backOptionTop = optionY + 20 - 20;
-        int backOptionBottom = optionY + 20 + 10;
-        if (x >= optionStartX && x <= optionEndX && y >= backOptionTop && y <= backOptionBottom) {
+        Rectangle backRect = MenuUtils.optionRect(panel, optionY + 20, 30);
+        if (backRect.contains(x, y)) {
             loadGameSelectedIndex = backButtonIndex;
             return true;
         }
