@@ -67,6 +67,10 @@ public class KeyHandler implements KeyListener {
                 gp.skipEndingCreditsSlide();
                 return;
             }
+            if (gp.gameState == gp.leaderboardState) {
+                gp.gameState = gp.titleState;
+                return;
+            }
         }
 
         if (code == KeyEvent.VK_F10) {

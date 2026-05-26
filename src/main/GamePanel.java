@@ -99,6 +99,7 @@ public class GamePanel extends JPanel implements Runnable{
     public final int titleSettingsState = 9;
     public final int titleLoadState = 10;
     public final int titleSaveState = 11;
+    public final int leaderboardState = 12;
     private static final int TRANSITION_NONE = 0;
     private static final int TRANSITION_MAP = 1;
     private static final int TRANSITION_TITLE_START = 2;
@@ -867,6 +868,9 @@ public class GamePanel extends JPanel implements Runnable{
         }
         if (gameState == endingState) {
             updateEndingSequence();
+        }
+        if (gameState == leaderboardState) {
+            //nothing
         }
         ui.update();
         applyMusicVolume();

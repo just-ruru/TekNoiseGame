@@ -101,6 +101,11 @@ public class UI {
     private Rectangle gameOverTryAgainBounds;
     private Rectangle gameOverBackToMenuBounds;
 
+    // Leaderboard UI
+    private final BufferedImage trophyIcon;
+    private final Rectangle trophyIconBounds;
+
+
     public UI(GamePanel gp) {
         this.gp = gp;
 
@@ -184,6 +189,9 @@ public class UI {
             gameOverBackToMenuImg = createFallbackTitleButton("BACK TO MENU");
             gameOverBackToMenuBounds = new Rectangle((gp.screenWidth - TITLE_BUTTON_WIDTH) / 2, gp.screenHeight / 2 + 50 + TITLE_BUTTON_HEIGHT + 20, TITLE_BUTTON_WIDTH, TITLE_BUTTON_HEIGHT);
         }
+
+        trophyIcon = loadMenuImage("/mainmenu/iconTrophy.png");
+        trophyIconBounds = new Rectangle(gp.screenWidth - gp.tileSize * 2, gp.screenHeight - gp.tileSize * 2, gp.tileSize, gp.tileSize);
     }
 
     public void showMessage(String text) {
@@ -255,6 +263,10 @@ public class UI {
 
         if (gp.gameState == gp.endingState) {
             drawEndingScreen();
+        }
+
+        if (gp.gameState == gp.leaderboardState) {
+            drawLeaderboardScreen();
         }
 
         if (gp.isHotkeyGuideVisible()) {
@@ -550,6 +562,38 @@ public class UI {
         for (int i = 0; i < titleButtonImages.length; i++) {
             drawTitleButton(titleButtonImages[i], titleButtonBounds[i], commandNum == i);
         }
+
+        if (trophyIcon != null) {
+            g2.drawImage(trophyIcon, trophyIconBounds.x, trophyIconBounds.y, trophyIconBounds.width, trophyIconBounds.height, null);
+        }
+    }
+
+    public void drawLeaderboardScreen() {
+        drawTitleBackgroundOnly();
+        drawEndingPanelBase();
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Monospaced", Font.BOLD, 28));
+        drawCenteredLine("Leaderboard", gp.screenHeight / 2 - 140);
+
+        java.util.List<LeaderboardManager.Entry> entries = gp.getLeaderboardEntries();
+        int startY = gp.screenHeight / 2 - 66;
+        int lineHeight = 26;
+        int maxRows = 8;
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 16));
+        if (entries.isEmpty()) {
+            drawCenteredLine("No entries yet!", startY);
+        } else {
+            for (int i = 0; i < Math.min(maxRows, entries.size()); i++) {
+                LeaderboardManager.Entry entry = entries.get(i);
+                String line = String.format("%d. %-16s %s", i + 1, entry.name, gp.formatTime(entry.timeNanos));
+                drawCenteredLine(line, startY + (i * lineHeight));
+            }
+        }
+
+        g2.setColor(new Color(220, 220, 220));
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        drawCenteredLine("Press ESC to close", gp.screenHeight - gp.tileSize);
     }
 
     public void drawTitleSettingsScreen() {
@@ -1162,6 +1206,11 @@ public class UI {
     }
 
     public boolean activateTitleCommandAt(int x, int y) {
+        if (trophyIconBounds.contains(x, y)) {
+            gp.gameState = gp.leaderboardState;
+            return true;
+        }
+
         if (!selectTitleCommandAt(x, y)) {
             return false;
         }
