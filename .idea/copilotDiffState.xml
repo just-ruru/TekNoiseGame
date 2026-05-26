@@ -3,14 +3,6 @@
   <component name="CopilotDiffPersistence">
     <option name="pendingDiffs">
       <map>
-        <entry key="$PROJECT_DIR$/src/main/MenuUtils.java">
-          <value>
-            <PendingDiffInfo>
-              <option name="filePath" value="$PROJECT_DIR$/src/main/MenuUtils.java" />
-              <option name="updatedContent" value="package main;&#10;&#10;import java.awt.Rectangle;&#10;&#10;public class MenuUtils {&#10;    public static Rectangle panelRect(GamePanel gp, int panelWidth, int panelHeight) {&#10;        int x = (gp.screenWidth - panelWidth) / 2;&#10;        int y = (gp.screenHeight - panelHeight) / 2;&#10;        return new Rectangle(x, y, panelWidth, panelHeight);&#10;    }&#10;&#10;    public static int optionStartX(Rectangle panel) {&#10;        return panel.x + 28;&#10;    }&#10;&#10;    public static int optionEndX(Rectangle panel) {&#10;        return panel.x + panel.width - 28;&#10;    }&#10;&#10;    public static Rectangle optionRect(Rectangle panel, int optionY, int optionHeight) {&#10;        int startX = optionStartX(panel);&#10;        int width = optionEndX(panel) - startX;&#10;        int top = optionY - 20;&#10;        return new Rectangle(startX, top, width, optionHeight);&#10;    }&#10;&#10;    public static Rectangle optionRectForIndex(Rectangle panel, int optionIndex, int optionStartY, int lineHeight, int optionHeight) {&#10;        int optionY = panel.y + optionStartY + optionIndex * lineHeight;&#10;        return optionRect(panel, optionY, optionHeight);&#10;    }&#10;&#10;    public static Rectangle backOptionRect(Rectangle panel, int optionY, int extraYOffset) {&#10;        int y = optionY + extraYOffset;&#10;        return optionRect(panel, y, 30);&#10;    }&#10;}&#10;" />
-            </PendingDiffInfo>
-          </value>
-        </entry>
         <entry key="$PROJECT_DIR$/src/main/UI.java">
           <value>
             <PendingDiffInfo>

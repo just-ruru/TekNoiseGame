@@ -19,6 +19,7 @@ import java.util.prefs.Preferences;
 import main.MapConfig;
 
 import main.IntroCutscenePlayer;
+import java.nio.file.Paths;
 
 public class GamePanel extends JPanel implements Runnable{
 
@@ -191,6 +192,8 @@ public class GamePanel extends JPanel implements Runnable{
     private static final int ENDING_PHASE_WHITE_FADE = 2;
     private static final int ENDING_PHASE_STATEMENT = 3;
     private static final int ENDING_PHASE_FADE_TO_START = 4;
+    private static final int ENDING_PHASE_NAME_ENTRY = 5;
+    private static final int ENDING_PHASE_LEADERBOARD = 6;
     private static final int ENDING_BLACK_HOLD_TICKS = 60;
     private static final int ENDING_PHANTOM_FADE_IN_TICKS = 90;
     private static final int ENDING_PHANTOM_HOLD_TICKS = 60;
@@ -222,6 +225,14 @@ public class GamePanel extends JPanel implements Runnable{
     private boolean firstEnemyHintPending = false;
     private int firstEnemyHintTicksRemaining = 0;
     private int gameOverSequenceTicks = 0;
+    private final LeaderboardManager leaderboardManager = new LeaderboardManager(Paths.get("saves", "leaderboard.txt"));
+    private java.util.List<LeaderboardManager.Entry> leaderboardEntries = new ArrayList<>();
+    private final StringBuilder leaderboardNameInput = new StringBuilder();
+    private long runElapsedNanos = 0L;
+    private long runTimerLastNanos = 0L;
+    private boolean runTimerActive = false;
+    private long completedRunTimeNanos = 0L;
+    private String lastSubmittedLeaderboardName = "";
     private boolean stage3FlickerDisabled = false;
     private int stage3EnemyUpdateFrameBucket = 0;
 
@@ -385,6 +396,7 @@ public class GamePanel extends JPanel implements Runnable{
         stage3MoveToClueTicks = 0;
         stage3BarrierBroken = false;
         resetEndingState();
+        resetLeaderboardFlow();
         resetGameOverSequence();
         vignette.fullReset();
         devSettings.reset();
@@ -401,6 +413,9 @@ public class GamePanel extends JPanel implements Runnable{
         phantomVoice.setFile(6);
         applyPhantomVoiceVolume();
         pendingStartDialogue = null;
+        stopRunTimer();
+        runElapsedNanos = 0L;
+        completedRunTimeNanos = 0L;
         gameState = titleState;
         playMusic(0);
     }
@@ -451,6 +466,7 @@ public class GamePanel extends JPanel implements Runnable{
             props.setProperty("stage3BarrierBroken", String.valueOf(stage3BarrierBroken));
             props.setProperty("firstEnemyHintPending", String.valueOf(firstEnemyHintPending));
             props.setProperty("firstEnemyHintTicksRemaining", String.valueOf(firstEnemyHintTicksRemaining));
+            props.setProperty("runElapsedNanos", String.valueOf(getCurrentRunTimeNanos()));
 
             // Candle puzzle state
             StringBuilder candleOrder = new StringBuilder();
@@ -524,6 +540,7 @@ public class GamePanel extends JPanel implements Runnable{
             boolean savedStage3BarrierBroken = Boolean.parseBoolean(props.getProperty("stage3BarrierBroken", "false"));
             boolean savedFirstEnemyHintPending = Boolean.parseBoolean(props.getProperty("firstEnemyHintPending", "false"));
             int savedFirstEnemyHintTicksRemaining = Integer.parseInt(props.getProperty("firstEnemyHintTicksRemaining", "0"));
+            long savedRunElapsedNanos = Long.parseLong(props.getProperty("runElapsedNanos", "0"));
 
             String candleOrderStr = props.getProperty("litCandleOrder", "");
             java.util.List<Integer> savedLitCandleOrder = new java.util.ArrayList<>();
@@ -612,6 +629,10 @@ public class GamePanel extends JPanel implements Runnable{
 
             // Start game directly without title transition
             gameState = savedGameState == titleState ? playState : savedGameState;
+            runElapsedNanos = Math.max(0L, savedRunElapsedNanos);
+            runTimerLastNanos = System.nanoTime();
+            runTimerActive = (gameState == playState || gameState == cutsceneState || gameState == transitionState || gameState == introCutsceneState);
+            completedRunTimeNanos = 0L;
             playMusic(1);
 
             System.out.println("Game loaded from: " + saveFileName + ".properties");
@@ -731,6 +752,7 @@ public class GamePanel extends JPanel implements Runnable{
         stage3MoveToClueTicks = 0;
         stage3BarrierBroken = false;
         resetEndingState();
+        resetLeaderboardFlow();
         resetGameOverSequence();
         vignette.fullReset();
         devSettings.reset();
@@ -759,6 +781,11 @@ public class GamePanel extends JPanel implements Runnable{
         } else {
             pendingStartDialogue = null;
         }
+
+        runElapsedNanos = 0L;
+        completedRunTimeNanos = 0L;
+        runTimerLastNanos = System.nanoTime();
+        runTimerActive = true;
         
         saveCheckpoint(); // Save new game / load checkpoint state immediately
     }
@@ -788,6 +815,7 @@ public class GamePanel extends JPanel implements Runnable{
         if(interactCooldown > 0) {
             interactCooldown--;
         }
+        updateRunTimer();
         if(gameState == playState) {
             updateStageSpecificVisualModes();
             devSettings.applyContinuousEffects();
@@ -1647,8 +1675,11 @@ public class GamePanel extends JPanel implements Runnable{
             return;
         }
 
+        completedRunTimeNanos = getCurrentRunTimeNanos();
+        stopRunTimer();
         stopMusic();
         resetEndingState();
+        resetLeaderboardFlow();
         gameState = endingState;
     }
 
@@ -1731,17 +1762,19 @@ public class GamePanel extends JPanel implements Runnable{
             endingWhiteAlpha = fadeOutProgress;
             endingStatementAlpha = 0f;
             if (endingTick >= ENDING_FADE_TO_START_TICKS) {
-                endingPhase = ENDING_PHASE_BLACK_HOLD;
+                endingPhase = ENDING_PHASE_NAME_ENTRY;
                 endingTick = 0;
                 endingWhiteAlpha = 0f;
                 endingPhantomTextAlpha = 0f;
                 endingStatementAlpha = 0f;
-                currentMapPath = "/maps/stage01.txt";
-                tileM.loadMap(currentMapPath);
-                currentMapConfig = tileM.getCurrentMapConfig();
-                updateWorldDimensions();
-                setupGame();
             }
+            return;
+        }
+
+        if (endingPhase == ENDING_PHASE_NAME_ENTRY || endingPhase == ENDING_PHASE_LEADERBOARD) {
+            endingWhiteAlpha = 0f;
+            endingPhantomTextAlpha = 0f;
+            endingStatementAlpha = 0f;
         }
     }
 
@@ -1755,6 +1788,106 @@ public class GamePanel extends JPanel implements Runnable{
 
     private void resetGameOverSequence() {
         gameOverSequenceTicks = 0;
+    }
+
+    private void resetLeaderboardFlow() {
+        leaderboardEntries = leaderboardManager.readEntries();
+        leaderboardNameInput.setLength(0);
+        lastSubmittedLeaderboardName = "";
+    }
+
+    private void updateRunTimer() {
+        long now = System.nanoTime();
+        if (!runTimerActive) {
+            runTimerLastNanos = now;
+            return;
+        }
+
+        if (gameState == playState || gameState == cutsceneState || gameState == transitionState || gameState == introCutsceneState) {
+            runElapsedNanos += Math.max(0L, now - runTimerLastNanos);
+        }
+        runTimerLastNanos = now;
+    }
+
+    private void stopRunTimer() {
+        runTimerActive = false;
+        runTimerLastNanos = System.nanoTime();
+    }
+
+    public long getCurrentRunTimeNanos() {
+        if (completedRunTimeNanos > 0L) {
+            return completedRunTimeNanos;
+        }
+        return Math.max(0L, runElapsedNanos);
+    }
+
+    public String formatTime(long timeNanos) {
+        long totalMillis = Math.max(0L, timeNanos / 1_000_000L);
+        long minutes = totalMillis / 60000L;
+        long seconds = (totalMillis % 60000L) / 1000L;
+        long millis = totalMillis % 1000L;
+        return String.format("%02d:%02d.%03d", minutes, seconds, millis);
+    }
+
+    public String getFormattedRunTime() {
+        return formatTime(getCurrentRunTimeNanos());
+    }
+
+    public boolean isEndingNameEntryPhase() {
+        return gameState == endingState && endingPhase == ENDING_PHASE_NAME_ENTRY;
+    }
+
+    public boolean isEndingLeaderboardPhase() {
+        return gameState == endingState && endingPhase == ENDING_PHASE_LEADERBOARD;
+    }
+
+    public String getLeaderboardNameInput() {
+        return leaderboardNameInput.toString();
+    }
+
+    public java.util.List<LeaderboardManager.Entry> getLeaderboardEntries() {
+        return leaderboardEntries;
+    }
+
+    public String getLastSubmittedLeaderboardName() {
+        return lastSubmittedLeaderboardName;
+    }
+
+    public void appendLeaderboardNameChar(char inputChar) {
+        if (!isEndingNameEntryPhase() || leaderboardNameInput.length() >= 16) {
+            return;
+        }
+        if (Character.isLetterOrDigit(inputChar) || inputChar == ' ' || inputChar == '_' || inputChar == '-') {
+            leaderboardNameInput.append(inputChar);
+        }
+    }
+
+    public void deleteLeaderboardNameChar() {
+        if (!isEndingNameEntryPhase() || leaderboardNameInput.length() == 0) {
+            return;
+        }
+        leaderboardNameInput.deleteCharAt(leaderboardNameInput.length() - 1);
+    }
+
+    public void confirmLeaderboardNameEntry() {
+        if (isEndingNameEntryPhase()) {
+            String name = leaderboardNameInput.toString().trim();
+            if (name.isEmpty()) {
+                name = "Anonymous";
+            }
+            lastSubmittedLeaderboardName = name;
+            leaderboardEntries = leaderboardManager.addEntry(name, getCurrentRunTimeNanos());
+            endingPhase = ENDING_PHASE_LEADERBOARD;
+            return;
+        }
+
+        if (isEndingLeaderboardPhase()) {
+            currentMapPath = "/maps/stage01.txt";
+            tileM.loadMap(currentMapPath);
+            currentMapConfig = tileM.getCurrentMapConfig();
+            updateWorldDimensions();
+            setupGame();
+        }
     }
 
     public float getEndingWhiteAlpha() {
@@ -1775,6 +1908,32 @@ public class GamePanel extends JPanel implements Runnable{
             return 0;
         }
         return Math.max(0, endingTick / ticksPerLine);
+    }
+
+    public void skipEndingCreditsSlide() {
+        if (gameState != endingState || endingPhase != ENDING_PHASE_STATEMENT) {
+            return;
+        }
+
+        int totalStatementLines = ui.getEndingStatementLineCount();
+        int ticksPerLine = ENDING_STATEMENT_FADE_IN_TICKS + ENDING_STATEMENT_HOLD_TICKS + ENDING_STATEMENT_FADE_OUT_TICKS;
+        if (totalStatementLines <= 0 || ticksPerLine <= 0) {
+            endingPhase = ENDING_PHASE_FADE_TO_START;
+            endingTick = 0;
+            endingStatementAlpha = 0f;
+            return;
+        }
+
+        int currentLine = Math.max(0, Math.min(totalStatementLines - 1, endingTick / ticksPerLine));
+        if (currentLine >= totalStatementLines - 1) {
+            endingPhase = ENDING_PHASE_FADE_TO_START;
+            endingTick = 0;
+            endingStatementAlpha = 0f;
+            return;
+        }
+
+        endingTick = (currentLine + 1) * ticksPerLine;
+        endingStatementAlpha = 0f;
     }
 
     public boolean shouldShowFirstEnemyHint() {
@@ -2469,7 +2628,7 @@ public class GamePanel extends JPanel implements Runnable{
         }
         // Keep bosses fully responsive; stagger other enemies to reduce collision/path CPU.
         Entity entity = monster[monsterIndex];
-        if (entity instanceof MON_Stage3BossMomo || entity instanceof MON_Stage2WitherBoss) {
+        if (entity instanceof MON_Stage3BossMomo || entity instanceof MON_Stage2WitherBoss || entity instanceof MON_Dementor) {
             return true;
         }
         return (monsterIndex & 1) == stage3EnemyUpdateFrameBucket;

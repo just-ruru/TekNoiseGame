@@ -13,7 +13,9 @@ public class KeyHandler implements KeyListener {
 
     @Override
     public void keyTyped(KeyEvent e) {
-
+        if (gp.gameState == gp.endingState && gp.isEndingNameEntryPhase()) {
+            gp.appendLeaderboardNameChar(e.getKeyChar());
+        }
     }
 
     @Override
@@ -59,6 +61,10 @@ public class KeyHandler implements KeyListener {
                 }
                 gp.ui.commandNum = 1;
                 gp.ui.activateSelectedGameOverCommand();
+                return;
+            }
+            if (gp.gameState == gp.endingState) {
+                gp.skipEndingCreditsSlide();
                 return;
             }
         }
@@ -179,6 +185,17 @@ public class KeyHandler implements KeyListener {
             }
             if (code == KeyEvent.VK_ENTER) {
                 gp.ui.activateSelectedGameOverCommand();
+                return;
+            }
+        }
+
+        if (gp.gameState == gp.endingState) {
+            if (code == KeyEvent.VK_BACK_SPACE) {
+                gp.deleteLeaderboardNameChar();
+                return;
+            }
+            if (code == KeyEvent.VK_ENTER) {
+                gp.confirmLeaderboardNameEntry();
                 return;
             }
         }

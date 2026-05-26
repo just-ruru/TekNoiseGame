@@ -7,7 +7,7 @@ public class MON_Dementor extends Monster {
 
     private int imageVariant;
     private boolean forceChase = false;
-    private static final float STAGE3_CHASE_SPEED = 2.5f;
+    private static final float STAGE3_CHASE_SPEED = 2.8f;
 
     public MON_Dementor(GamePanel gp, int imageVariant) {
         super(gp);

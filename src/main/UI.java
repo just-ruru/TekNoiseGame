@@ -241,6 +241,7 @@ public class UI {
                 drawFirstEnemyHint();
             }
             drawKeyInventory();
+            drawRunTimer();
             drawInteractionPrompt();
         }
 
@@ -302,6 +303,15 @@ public class UI {
     }
 
     private void drawEndingScreen() {
+        if (gp.isEndingNameEntryPhase()) {
+            drawLeaderboardNameEntry();
+            return;
+        }
+        if (gp.isEndingLeaderboardPhase()) {
+            drawLeaderboardResults();
+            return;
+        }
+
         Composite oldComposite = g2.getComposite();
         Color oldColor = g2.getColor();
         Font oldFont = g2.getFont();
@@ -342,6 +352,101 @@ public class UI {
         g2.setComposite(oldComposite);
         g2.setColor(oldColor);
         g2.setFont(oldFont);
+    }
+
+    private void drawRunTimer() {
+        Font oldFont = g2.getFont();
+        Color oldColor = g2.getColor();
+        Composite oldComposite = g2.getComposite();
+
+        String timerText = "Time: " + gp.getFormattedRunTime();
+        g2.setFont(new Font("Monospaced", Font.BOLD, 16));
+        FontMetrics fm = g2.getFontMetrics();
+        int textX = gp.screenWidth - fm.stringWidth(timerText) - 12;
+        int textY = 28;
+
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.7f));
+        g2.setColor(Color.BLACK);
+        g2.drawString(timerText, textX + 1, textY + 1);
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(new Color(248, 242, 225));
+        g2.drawString(timerText, textX, textY);
+
+        g2.setComposite(oldComposite);
+        g2.setColor(oldColor);
+        g2.setFont(oldFont);
+    }
+
+    private void drawLeaderboardNameEntry() {
+        drawEndingPanelBase();
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Monospaced", Font.BOLD, 30));
+        drawCenteredLine("Run Complete", gp.screenHeight / 2 - 130);
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 18));
+        drawCenteredLine("Final Time: " + gp.getFormattedRunTime(), gp.screenHeight / 2 - 86);
+        drawCenteredLine("Enter your name and press Enter", gp.screenHeight / 2 - 52);
+
+        String enteredName = gp.getLeaderboardNameInput();
+        if (enteredName.trim().isEmpty()) {
+            enteredName = "Anonymous";
+        }
+        String inputLine = "> " + enteredName;
+        g2.setFont(new Font("Monospaced", Font.BOLD, 24));
+        drawCenteredLine(inputLine, gp.screenHeight / 2);
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 15));
+        drawCenteredLine("Backspace: delete", gp.screenHeight / 2 + 42);
+    }
+
+    private void drawLeaderboardResults() {
+        drawEndingPanelBase();
+        g2.setColor(Color.WHITE);
+        g2.setFont(new Font("Monospaced", Font.BOLD, 28));
+        drawCenteredLine("Leaderboard", gp.screenHeight / 2 - 140);
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 17));
+        drawCenteredLine("Your Time: " + gp.getFormattedRunTime(), gp.screenHeight / 2 - 104);
+
+        java.util.List<LeaderboardManager.Entry> entries = gp.getLeaderboardEntries();
+        int startY = gp.screenHeight / 2 - 66;
+        int lineHeight = 26;
+        int maxRows = 8;
+        String submittedName = gp.getLastSubmittedLeaderboardName();
+        long submittedTime = gp.getCurrentRunTimeNanos();
+
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 16));
+        for (int i = 0; i < Math.min(maxRows, entries.size()); i++) {
+            LeaderboardManager.Entry entry = entries.get(i);
+            boolean isCurrentRun = entry.name.equals(submittedName) && entry.timeNanos == submittedTime;
+            g2.setColor(isCurrentRun ? new Color(255, 233, 164) : Color.WHITE);
+            String line = String.format("%d. %-16s %s", i + 1, entry.name, gp.formatTime(entry.timeNanos));
+            drawCenteredLine(line, startY + (i * lineHeight));
+        }
+
+        g2.setColor(new Color(220, 220, 220));
+        g2.setFont(new Font("Monospaced", Font.PLAIN, 14));
+        drawCenteredLine("Press Enter to return to title", gp.screenHeight / 2 + 150);
+    }
+
+    private void drawEndingPanelBase() {
+        g2.setColor(Color.BLACK);
+        g2.fillRect(0, 0, gp.screenWidth, gp.screenHeight);
+
+        int panelWidth = gp.screenWidth - (gp.tileSize * 3);
+        int panelHeight = gp.screenHeight - (gp.tileSize * 3);
+        int panelX = (gp.screenWidth - panelWidth) / 2;
+        int panelY = (gp.screenHeight - panelHeight) / 2;
+
+        Composite oldComposite = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.88f));
+        g2.setColor(Color.BLACK);
+        g2.fillRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(Color.WHITE);
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(panelX, panelY, panelWidth, panelHeight, 12, 12);
+        g2.setComposite(oldComposite);
     }
 
     private void drawHotkeyGuide() {
